@@ -1,0 +1,94 @@
+import Link from "next/link";
+import { PaymentPill, Shell, osStatusLabel } from "@/components/Shell";
+import { formatBRL } from "@/lib/money";
+import { requireOrg } from "@/lib/session";
+
+type Row = {
+  id: string;
+  number: number;
+  status: string;
+  os_date: string;
+  total_cents: number;
+  customers: { name: string } | null;
+};
+
+export default async function ServiceOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+  const { sb, orgId, orgName } = await requireOrg();
+  const { q, status } = await searchParams;
+
+  let query = sb
+    .from("service_orders")
+    .select("id, number, status, os_date, total_cents, customers(name)")
+    .eq("org_id", orgId)
+    .order("number", { ascending: false })
+    .limit(100);
+  if (status) query = query.eq("status", status);
+  if (q && /^\d+$/.test(q)) query = query.eq("number", Number(q));
+  const { data: orders } = await query;
+  const rows = ((orders ?? []) as unknown as Row[]).filter(
+    (r) => !q || /^\d+$/.test(q) || r.customers?.name.toLowerCase().includes(q.toLowerCase()),
+  );
+
+  const ids = rows.map((r) => r.id);
+  const { data: pay } = ids.length
+    ? await sb.from("service_order_payment_view").select("service_order_id, payment_status").in("service_order_id", ids)
+    : { data: [] };
+  const payBy = new Map((pay ?? []).map((p) => [p.service_order_id as string, p.payment_status as string]));
+
+  return (
+    <Shell orgName={orgName}>
+      <div className="spread">
+        <h1 style={{ margin: 0 }}>Ordens de serviço</h1>
+        <Link className="btn btn-primary" href="/os/nova">
+          Nova ordem de serviço
+        </Link>
+      </div>
+      <form className="row" style={{ marginBottom: 16 }}>
+        <input name="q" placeholder="Nº da OS ou cliente" defaultValue={q} style={{ maxWidth: 280 }} />
+        <select name="status" defaultValue={status ?? ""} style={{ maxWidth: 200 }}>
+          <option value="">Todos os status</option>
+          {["open", "approved", "in_progress", "waiting_parts", "done", "delivered", "cancelled"].map((s) => (
+            <option key={s} value={s}>
+              {osStatusLabel(s)}
+            </option>
+          ))}
+        </select>
+        <button className="btn btn-secondary">Filtrar</button>
+      </form>
+      {rows.length === 0 ? (
+        <div className="card empty">
+          Nenhuma ordem de serviço ainda. <Link href="/os/nova">Crie a primeira</Link>.
+        </div>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Nº</th>
+              <th>Cliente</th>
+              <th>Data</th>
+              <th>Status</th>
+              <th>Pagamento</th>
+              <th className="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <Link href={`/os/${r.id}`}>#{r.number}</Link>
+                </td>
+                <td>{r.customers?.name}</td>
+                <td>{new Date(r.os_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
+                <td>{osStatusLabel(r.status)}</td>
+                <td>
+                  <PaymentPill status={payBy.get(r.id) ?? "not_billed"} />
+                </td>
+                <td className="num">{formatBRL(r.total_cents)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Shell>
+  );
+}

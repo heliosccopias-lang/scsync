@@ -1,0 +1,74 @@
+/* SCsync base tokens: soft black, soft orange, warm white. replica-design will refine. */
+:root {
+  --ink: #2b2a28;          /* soft black: text, header */
+  --ink-2: #5c5a56;        /* secondary text */
+  --ink-3: #8a8780;        /* muted text, borders on dark */
+  --paper: #fbf8f4;        /* warm white: page */
+  --card: #ffffff;
+  --line: #ece6de;
+  --orange: #e8834a;       /* soft orange: primary actions */
+  --orange-ink: #a5531f;   /* orange text on light (contrast) */
+  --orange-soft: #fbe7da;  /* orange tint: highlights */
+  --ok: #356b48;
+  --ok-soft: #e3f1e7;
+  --warn: #7f560a;
+  --warn-soft: #f8edd3;
+  --bad: #a33a2c;
+  --bad-soft: #f7e0dc;
+  --radius: 10px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.5; }
+a { color: var(--orange-ink); }
+
+.topbar { background: var(--ink); color: var(--paper); display: flex; align-items: center; gap: 24px; padding: 0 24px; height: 56px; }
+.topbar .brand { font-weight: 700; letter-spacing: .2px; }
+.topbar .brand span { color: var(--orange); }
+.topbar nav { display: flex; gap: 18px; flex: 1; }
+.topbar nav a { color: #e9e4dc; text-decoration: none; font-size: 14px; }
+.topbar nav a:hover { color: var(--orange); }
+.topbar .org { color: #b3aea5; font-size: 13px; }
+
+main { max-width: 1080px; margin: 0 auto; padding: 28px 24px 64px; }
+h1 { font-size: 22px; margin: 0 0 20px; }
+h2 { font-size: 16px; margin: 28px 0 12px; }
+.muted { color: var(--ink-2); }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 8px; padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn-primary { background: var(--orange); color: var(--ink); }   /* 5.3:1, white on soft orange fails */
+.btn-primary:hover { background: #ef9663; }
+.btn-secondary { background: var(--card); color: var(--ink); border-color: var(--line); }
+.btn-secondary:hover { border-color: var(--ink-3); }
+.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--orange-soft); outline-offset: 1px; border-color: var(--orange); }
+
+label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+input, select, textarea { width: 100%; font: inherit; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+textarea { min-height: 70px; }
+.field { margin-bottom: 14px; }
+
+table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+th { background: #f6f1ea; color: var(--ink-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill-open { background: var(--orange-soft); color: var(--orange-ink); }
+.pill-paid { background: var(--ok-soft); color: var(--ok); }
+.pill-partial { background: var(--warn-soft); color: var(--warn); }
+.pill-overdue { background: var(--bad-soft); color: var(--bad); }
+.pill-neutral { background: #eee9e2; color: var(--ink-2); }
+
+.notice { padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+.notice-error { background: var(--bad-soft); color: var(--bad); }
+.notice-ok { background: var(--ok-soft); color: var(--ok); }
+.empty { text-align: center; padding: 40px; color: var(--ink-2); }
+code.copy { display: block; word-break: break-all; background: #f6f1ea; padding: 10px; border-radius: 8px; font-size: 12px; }
