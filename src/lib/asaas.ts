@@ -80,6 +80,10 @@ export class AsaasClient {
     return this.request<{ id: string }>("POST", "/customers", input);
   }
 
+  updateCustomer(id: string, input: { name?: string; cpfCnpj?: string; email?: string | null; mobilePhone?: string | null }) {
+    return this.request<{ id: string }>("POST", `/customers/${encodeURIComponent(id)}`, input);
+  }
+
   createPayment(input: {
     customer: string;
     billingType: BillingType;

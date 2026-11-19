@@ -4,31 +4,10 @@ import { redirect } from "next/navigation";
 import { addMonths, parseBRL, parseQuantity, splitInstallments, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
 import { LINES } from "./constants";
+import { isValidCnpj, isValidCpf } from "@/lib/br";
 
 
 export type FormState = { error?: string; field?: string; values?: Record<string, string> };
-
-function isValidCpf(d: string) {
-  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false;
-  const calc = (len: number) => {
-    let sum = 0;
-    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i);
-    const r = (sum * 10) % 11;
-    return r === 10 ? 0 : r;
-  };
-  return calc(9) === Number(d[9]) && calc(10) === Number(d[10]);
-}
-
-function isValidCnpj(d: string) {
-  if (!/^\d{14}$/.test(d) || /^(\d)\1{13}$/.test(d)) return false;
-  const calc = (len: number) => {
-    const w = len === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-    const sum = w.reduce((acc, wi, i) => acc + wi * Number(d[i]), 0);
-    const r = sum % 11;
-    return r < 2 ? 0 : 11 - r;
-  };
-  return calc(12) === Number(d[12]) && calc(13) === Number(d[13]);
-}
 
 export async function createOrder(_prev: FormState, form: FormData): Promise<FormState> {
   const values: Record<string, string> = {};

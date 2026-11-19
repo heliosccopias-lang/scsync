@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AsaasClient, billingTypeFor, webhookUrl } from "../src/lib/asaas";
+import { isValidCnpj, isValidCpf, whatsappLink, whatsappNumber } from "../src/lib/br";
 import { decryptSecret, encryptSecret, newWebhookToken, sha256, tokenMatchesHash } from "../src/lib/crypto";
 import { addMonths, formatBRL, parseBRL, parseQuantity, splitInstallments, todayInSaoPaulo } from "../src/lib/money";
 
@@ -108,5 +109,24 @@ describe("asaas client", () => {
       "https://scsync.vercel.app/api/webhooks/asaas/abc?x-vercel-protection-bypass=s3cret",
     );
     expect(webhookUrl("https://app.scsync.com.br/", "abc")).toBe("https://app.scsync.com.br/api/webhooks/asaas/abc");
+  });
+});
+
+describe("br", () => {
+  it("validates CPF and CNPJ check digits", () => {
+    expect(isValidCpf("52998224725")).toBe(true);
+    expect(isValidCpf("52998224724")).toBe(false);
+    expect(isValidCpf("11111111111")).toBe(false);
+    expect(isValidCnpj("11222333000181")).toBe(true);
+    expect(isValidCnpj("11222333000182")).toBe(false);
+  });
+
+  it("builds WhatsApp numbers and links for Brazilian phones", () => {
+    expect(whatsappNumber("(11) 98765-4321")).toBe("5511987654321");
+    expect(whatsappNumber("011 3333-4444")).toBe("551133334444");
+    expect(whatsappNumber("+55 21 99999-0000")).toBe("5521999990000");
+    expect(whatsappNumber("12345")).toBeNull();
+    expect(whatsappLink("11987654321", "Olá & tchau")).toBe("https://wa.me/5511987654321?text=Ol%C3%A1%20%26%20tchau");
+    expect(whatsappLink(null, "x")).toBeNull();
   });
 });

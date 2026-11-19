@@ -1,64 +1,33 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { Notice, PaymentPill, Shell, osStatusLabel } from "@/components/Shell";
-import { asaasFor, createChargeForReceivable, syncChargeFromAsaas } from "@/lib/charges";
-import { formatBRL } from "@/lib/money";
+import { whatsappLink } from "@/lib/br";
+import { formatBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
+import { charge, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
 
-const ERRORS: Record<string, string> = {
-  already_launched: "As contas desta OS já foram lançadas.",
-  no_installments: "A OS não tem parcelas.",
-  installments_sum_mismatch: "A soma das parcelas não bate com o total da OS.",
-  cancelled: "OS cancelada.",
+const METHOD: Record<string, string> = {
+  pix: "Pix",
+  boleto: "Boleto",
+  credit_card: "Cartão de crédito",
+  debit_card: "Cartão de débito",
+  cash: "Dinheiro",
+  transfer: "Transferência",
+  other: "Cliente escolhe",
 };
 
-function back(id: string, key: "error" | "ok", msg: string): never {
-  redirect(`/os/${id}?${key}=${encodeURIComponent(msg)}`);
-}
+const CHARGE_STATUS: Record<string, string> = {
+  pending: "Aguardando pagamento",
+  overdue: "Vencida",
+  confirmed: "Pagamento confirmado",
+  received: "Recebida",
+  refunded: "Estornada",
+  cancelled: "Cancelada",
+  chargeback: "Contestada",
+};
 
-async function launch(form: FormData) {
-  "use server";
-  const id = String(form.get("id"));
-  const { sb } = await requireOrg();
-  const { error } = await sb.rpc("launch_accounts", { p_service_order: id });
-  if (error) back(id, "error", ERRORS[error.message.split(":")[0]] ?? "Não foi possível lançar as contas.");
-  back(id, "ok", "Contas lançadas em contas a receber.");
-}
-
-async function charge(form: FormData) {
-  "use server";
-  const id = String(form.get("id"));
-  const receivableId = String(form.get("receivable_id"));
-  const { sb, orgId } = await requireOrg();
-  try {
-    await createChargeForReceivable(sb, orgId, receivableId);
-  } catch (e) {
-    back(id, "error", e instanceof Error ? e.message : "Falha ao gerar a cobrança.");
-  }
-  back(id, "ok", "Cobrança criada no Asaas.");
-}
-
-async function refresh(form: FormData) {
-  "use server";
-  const id = String(form.get("id"));
-  const paymentId = String(form.get("asaas_payment_id"));
-  const { sb, orgId } = await requireOrg();
-  const { data: own } = await sb.from("charges").select("id").eq("org_id", orgId).eq("asaas_payment_id", paymentId).maybeSingle();
-  if (!own) back(id, "error", "Cobrança não encontrada.");
-  const asaas = await asaasFor(orgId);
-  if (!asaas) back(id, "error", "Asaas não conectado.");
-  await syncChargeFromAsaas(orgId, asaas!, paymentId);
-  back(id, "ok", "Situação atualizada com o Asaas.");
-}
-
-async function setStatus(form: FormData) {
-  "use server";
-  const id = String(form.get("id"));
-  const status = String(form.get("status"));
-  const { sb, orgId } = await requireOrg();
-  const { error } = await sb.from("service_orders").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("org_id", orgId);
-  if (error) back(id, "error", "Status inválido.");
-  back(id, "ok", "Status atualizado.");
+function fmtDate(d: string) {
+  return new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
 export default async function ServiceOrderPage({
@@ -74,7 +43,7 @@ export default async function ServiceOrderPage({
 
   const { data: os } = await sb
     .from("service_orders")
-    .select("*, customers(name, cpf_cnpj, email, phone)")
+    .select("*, customers(id, name, cpf_cnpj, email, phone)")
     .eq("id", id)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -89,21 +58,29 @@ export default async function ServiceOrderPage({
       .eq("origin_type", "service_order")
       .eq("origin_id", id)
       .order("due_date"),
-    sb.from("service_order_payment_view").select("payment_status, billed_cents, paid_cents").eq("service_order_id", id).maybeSingle(),
+    sb.from("service_order_payment_view").select("payment_status").eq("service_order_id", id).maybeSingle(),
   ]);
   const recIds = (receivables ?? []).map((r) => r.id);
-  const { data: charges } = recIds.length
-    ? await sb
-        .from("charges")
-        .select("receivable_id, asaas_payment_id, status, billing_type, invoice_url, bank_slip_url, pix_payload")
-        .in("receivable_id", recIds)
-        .order("created_at", { ascending: false })
-    : { data: [] };
+  const [{ data: charges }, { data: settlements }] = recIds.length
+    ? await Promise.all([
+        sb
+          .from("charges")
+          .select("receivable_id, asaas_payment_id, status, billing_type, invoice_url, bank_slip_url, pix_payload")
+          .in("receivable_id", recIds)
+          .order("created_at", { ascending: false }),
+        sb
+          .from("settlements")
+          .select("id, receivable_id, paid_on, amount_cents, interest_cents, method, source, reference, card_installments, reversed_at")
+          .in("receivable_id", recIds)
+          .order("created_at"),
+      ])
+    : [{ data: [] }, { data: [] }];
   const chargeBy = new Map<string, NonNullable<typeof charges>[number]>();
   for (const c of charges ?? []) if (!chargeBy.has(c.receivable_id)) chargeBy.set(c.receivable_id, c);
 
-  const customer = os.customers as unknown as { name: string; cpf_cnpj: string | null; email: string | null; phone: string | null };
+  const customer = os.customers as unknown as { id: string; name: string; cpf_cnpj: string | null; email: string | null; phone: string | null };
   const launched = Boolean(os.accounts_launched_at);
+  const total = (receivables ?? []).length;
 
   return (
     <Shell orgName={orgName}>
@@ -113,34 +90,64 @@ export default async function ServiceOrderPage({
             ← Ordens de serviço
           </Link>
           <h1 style={{ margin: "6px 0 0" }}>
-            {os.kind === "quote" ? "Orçamento" : "OS"} #{os.number}{" "}
-            <PaymentPill status={pay?.payment_status ?? "not_billed"} />
+            {os.kind === "quote" ? "Orçamento" : "OS"} #{os.number} <PaymentPill status={pay?.payment_status ?? "not_billed"} />
           </h1>
         </div>
-        <form action={setStatus} className="row">
+        <div className="row">
           <Link href={`/os/${id}/imprimir`} className="btn btn-primary">
             Imprimir OS
           </Link>
-          <input type="hidden" name="id" value={id} />
-          <select name="status" defaultValue={os.status} aria-label="Status da OS" style={{ width: 190 }}>
-            {["open", "approved", "in_progress", "waiting_parts", "done", "delivered", "cancelled"].map((s) => (
-              <option key={s} value={s}>
-                {osStatusLabel(s)}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-secondary">Alterar status</button>
-        </form>
+          <form action={setStatus} className="row">
+            <input type="hidden" name="id" value={id} />
+            <select name="status" defaultValue={os.status} aria-label="Status da OS" style={{ width: 190 }}>
+              {["open", "approved", "in_progress", "waiting_parts", "done", "delivered", "cancelled"].map((s) => (
+                <option key={s} value={s}>
+                  {osStatusLabel(s)}
+                </option>
+              ))}
+            </select>
+            <button className="btn btn-secondary">Alterar status</button>
+          </form>
+        </div>
       </div>
       <Notice error={error} ok={ok} />
 
       <div className="grid2">
         <div className="card">
-          <div className="muted">Cliente</div>
+          <div className="spread" style={{ marginBottom: 4 }}>
+            <span className="muted">Cliente</span>
+            {!customer?.cpf_cnpj ? <span className="pill pill-overdue">Sem CPF/CNPJ</span> : null}
+          </div>
           <strong>{customer?.name}</strong>
           <div className="muted">
-            {customer?.cpf_cnpj ?? "sem CPF/CNPJ"} · {customer?.email ?? "sem e-mail"} · {customer?.phone ?? "sem celular"}
+            {customer?.cpf_cnpj ?? "sem CPF/CNPJ"} · {customer?.phone ?? "sem celular"} · {customer?.email ?? "sem e-mail"}
           </div>
+          <details style={{ marginTop: 8 }} open={!customer?.cpf_cnpj}>
+            <summary>Editar cliente</summary>
+            <form action={updateCustomer} style={{ marginTop: 10 }}>
+              <input type="hidden" name="id" value={id} />
+              <input type="hidden" name="customer_id" value={customer?.id} />
+              <div className="field">
+                <label htmlFor="c_name">Nome</label>
+                <input id="c_name" name="name" defaultValue={customer?.name} required />
+              </div>
+              <div className="grid2">
+                <div className="field">
+                  <label htmlFor="c_doc">CPF/CNPJ (o Asaas exige)</label>
+                  <input id="c_doc" name="cpf_cnpj" inputMode="numeric" defaultValue={customer?.cpf_cnpj ?? ""} />
+                </div>
+                <div className="field">
+                  <label htmlFor="c_phone">Celular com DDD (WhatsApp)</label>
+                  <input id="c_phone" name="phone" inputMode="tel" defaultValue={customer?.phone ?? ""} />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="c_email">E-mail</label>
+                <input id="c_email" name="email" type="email" defaultValue={customer?.email ?? ""} />
+              </div>
+              <button className="btn btn-secondary">Salvar cliente</button>
+            </form>
+          </details>
         </div>
         <div className="card">
           <div className="muted">Equipamento / problema</div>
@@ -170,12 +177,14 @@ export default async function ServiceOrderPage({
               <td className="num">{formatBRL(it.total_cents)}</td>
             </tr>
           ))}
-          <tr>
-            <td colSpan={4} className="num muted">
-              Desconto
-            </td>
-            <td className="num">− {formatBRL(os.discount_cents)}</td>
-          </tr>
+          {os.discount_cents > 0 ? (
+            <tr>
+              <td colSpan={4} className="num muted">
+                Desconto
+              </td>
+              <td className="num">− {formatBRL(os.discount_cents)}</td>
+            </tr>
+          ) : null}
           <tr>
             <td colSpan={4} className="num">
               <strong>Total da OS</strong>
@@ -198,103 +207,205 @@ export default async function ServiceOrderPage({
       </div>
 
       {!launched ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Parcela</th>
-              <th>Vencimento</th>
-              <th>Forma</th>
-              <th className="num">Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(installments ?? []).map((i) => (
-              <tr key={i.id}>
-                <td>{i.number}</td>
-                <td>{new Date(i.due_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
-                <td>{i.method}</td>
-                <td className="num">{formatBRL(i.amount_cents)}</td>
+        <>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Clique em <strong>Lançar contas</strong> para transformar as parcelas abaixo em contas a receber. Depois você escolhe, em cada parcela, se cobra
+            pelo Asaas (Pix, boleto, cartão online) ou se recebe na maquininha ou em dinheiro.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Parcela</th>
+                <th>Vencimento</th>
+                <th>Forma</th>
+                <th className="num">Valor</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Título</th>
-              <th>Vencimento</th>
-              <th>Situação</th>
-              <th>Cobrança Asaas</th>
-              <th className="num">Valor</th>
-              <th className="num">Recebido</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(receivables ?? []).map((r) => {
-              const c = chargeBy.get(r.id);
-              const live = c && !["cancelled", "refunded"].includes(c.status);
-              const status = r.overdue ? "overdue" : r.status;
-              return (
-                <tr key={r.id}>
-                  <td>{r.name}</td>
-                  <td>{new Date(r.due_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
-                  <td>
-                    <PaymentPill status={status} />
-                  </td>
-                  <td>
-                    {live ? (
-                      <div>
-                        <span className="muted">{c.status}</span>
-                        {c.invoice_url ? (
-                          <>
-                            {" · "}
-                            <a href={c.invoice_url} target="_blank" rel="noreferrer">
-                              link de pagamento
-                            </a>
-                          </>
-                        ) : null}
-                        {c.bank_slip_url ? (
-                          <>
-                            {" · "}
-                            <a href={c.bank_slip_url} target="_blank" rel="noreferrer">
-                              boleto
-                            </a>
-                          </>
-                        ) : null}
-                        {c.pix_payload && r.status !== "paid" ? (
-                          <details>
-                            <summary>Pix copia e cola</summary>
-                            <code className="copy">{c.pix_payload}</code>
-                          </details>
-                        ) : null}
-                        <form action={refresh}>
-                          <input type="hidden" name="id" value={id} />
-                          <input type="hidden" name="asaas_payment_id" value={c.asaas_payment_id} />
-                          <button className="btn btn-secondary" style={{ padding: "3px 8px", fontSize: 12, marginTop: 4 }}>
-                            Consultar no Asaas
-                          </button>
-                        </form>
-                      </div>
-                    ) : r.status === "paid" || r.method === "cash" ? (
-                      <span className="muted">—</span>
-                    ) : (
-                      <form action={charge}>
-                        <input type="hidden" name="id" value={id} />
-                        <input type="hidden" name="receivable_id" value={r.id} />
-                        <button className="btn btn-primary" style={{ padding: "5px 10px", fontSize: 13 }}>
-                          Gerar cobrança
-                        </button>
-                      </form>
-                    )}
-                  </td>
-                  <td className="num">{formatBRL(r.amount_cents)}</td>
-                  <td className="num">{formatBRL(r.paid_cents)}</td>
+            </thead>
+            <tbody>
+              {(installments ?? []).map((i) => (
+                <tr key={i.id}>
+                  <td>{i.number}</td>
+                  <td>{fmtDate(i.due_date)}</td>
+                  <td>{METHOD[i.method] ?? i.method}</td>
+                  <td className="num">{formatBRL(i.amount_cents)}</td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        (receivables ?? []).map((r, idx) => {
+          const c = chargeBy.get(r.id);
+          const live = c && ["pending", "overdue", "confirmed"].includes(c.status);
+          const open = r.status !== "paid" && r.status !== "cancelled";
+          const status = r.overdue ? "overdue" : r.status;
+          const message = [
+            `Olá, ${customer?.name?.split(" ")[0] ?? ""}! Aqui é da ${orgName}.`,
+            `Segue a cobrança da OS nº ${os.number}${total > 1 ? ` (parcela ${idx + 1}/${total})` : ""}.`,
+            `Valor: ${formatBRL(r.open_cents)}`,
+            `Vencimento: ${fmtDate(r.due_date)}`,
+            c?.invoice_url ? `\nPague por Pix, boleto ou cartão neste link:\n${c.invoice_url}` : "",
+            c?.pix_payload ? `\nOu use o Pix copia e cola:\n${c.pix_payload}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          const wa = live ? whatsappLink(customer?.phone, message) : null;
+          const recSettlements = (settlements ?? []).filter((s) => s.receivable_id === r.id);
+
+          return (
+            <div key={r.id} className="card" style={{ marginBottom: 12 }}>
+              <div className="spread" style={{ marginBottom: 8 }}>
+                <div>
+                  <strong>{r.name}</strong>{" "}
+                  <span className="muted">
+                    · vence {fmtDate(r.due_date)} · {formatBRL(r.amount_cents)}
+                    {r.paid_cents > 0 ? ` · recebido ${formatBRL(r.paid_cents)}` : ""}
+                  </span>
+                </div>
+                <PaymentPill status={status} />
+              </div>
+
+              {live ? (
+                <div className="notice" style={{ background: "var(--orange-soft)", color: "var(--ink)", marginBottom: 10 }}>
+                  <div className="spread" style={{ marginBottom: 6 }}>
+                    <strong>Cobrança Asaas: {CHARGE_STATUS[c.status] ?? c.status}</strong>
+                    <form action={refresh}>
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="asaas_payment_id" value={c.asaas_payment_id} />
+                      <button className="btn btn-secondary" style={{ padding: "3px 8px", fontSize: 12 }}>
+                        Consultar no Asaas
+                      </button>
+                    </form>
+                  </div>
+                  <div className="row">
+                    {wa ? (
+                      <a className="btn btn-primary" href={wa} target="_blank" rel="noreferrer">
+                        Enviar por WhatsApp
+                      </a>
+                    ) : (
+                      <span className="muted">Cadastre o celular do cliente para enviar por WhatsApp.</span>
+                    )}
+                    {c.invoice_url ? (
+                      <a className="btn btn-secondary" href={c.invoice_url} target="_blank" rel="noreferrer">
+                        Abrir link de pagamento
+                      </a>
+                    ) : null}
+                    {c.bank_slip_url ? (
+                      <a className="btn btn-secondary" href={c.bank_slip_url} target="_blank" rel="noreferrer">
+                        Boleto
+                      </a>
+                    ) : null}
+                  </div>
+                  {c.pix_payload ? (
+                    <details style={{ marginTop: 8 }}>
+                      <summary>Pix copia e cola</summary>
+                      <code className="copy">{c.pix_payload}</code>
+                    </details>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {open ? (
+                <div className="row" style={{ alignItems: "flex-start" }}>
+                  {!live ? (
+                    <form action={charge}>
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="receivable_id" value={r.id} />
+                      <button className="btn btn-primary">Cobrar pelo Asaas (Pix / link)</button>
+                    </form>
+                  ) : null}
+                  <details style={{ flex: 1, minWidth: 280 }}>
+                    <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>
+                      Receber na maquininha / dinheiro
+                    </summary>
+                    <form action={receiveManual} className="card" style={{ marginTop: 10 }}>
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="receivable_id" value={r.id} />
+                      {live ? (
+                        <p className="muted" style={{ marginTop: 0 }}>
+                          Ao registrar, a cobrança aberta no Asaas é cancelada para o cliente não pagar duas vezes.
+                        </p>
+                      ) : null}
+                      <div className="grid2">
+                        <div className="field">
+                          <label htmlFor={`m_${r.id}`}>Forma</label>
+                          <select id={`m_${r.id}`} name="method" defaultValue="debit_card">
+                            <option value="debit_card">Cartão de débito (maquininha)</option>
+                            <option value="credit_card">Cartão de crédito (maquininha)</option>
+                            <option value="cash">Dinheiro</option>
+                            <option value="pix">Pix direto na conta</option>
+                            <option value="transfer">Transferência</option>
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`a_${r.id}`}>Valor recebido (R$)</label>
+                          <input id={`a_${r.id}`} name="amount" inputMode="decimal" defaultValue={(r.open_cents / 100).toFixed(2).replace(".", ",")} />
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`d_${r.id}`}>Data</label>
+                          <input id={`d_${r.id}`} name="paid_on" type="date" defaultValue={todayInSaoPaulo()} />
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`i_${r.id}`}>Parcelas no cartão de crédito</label>
+                          <input id={`i_${r.id}`} name="card_installments" type="number" min={1} max={24} defaultValue={1} />
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`ref_${r.id}`}>Código de autorização / NSU (opcional)</label>
+                        <input id={`ref_${r.id}`} name="reference" />
+                      </div>
+                      <button className="btn btn-primary">Registrar recebimento</button>
+                    </form>
+                  </details>
+                </div>
+              ) : null}
+
+              {recSettlements.length ? (
+                <table style={{ marginTop: 10 }}>
+                  <thead>
+                    <tr>
+                      <th>Recebido em</th>
+                      <th>Forma</th>
+                      <th>Origem</th>
+                      <th className="num">Valor</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recSettlements.map((s) => (
+                      <tr key={s.id} style={s.reversed_at ? { opacity: 0.5, textDecoration: "line-through" } : undefined}>
+                        <td>{fmtDate(s.paid_on)}</td>
+                        <td>
+                          {METHOD[s.method] ?? s.method}
+                          {s.card_installments && s.card_installments > 1 ? ` ${s.card_installments}x` : ""}
+                          {s.reference ? <span className="muted"> · NSU {s.reference}</span> : null}
+                        </td>
+                        <td>{s.source === "asaas_webhook" ? "Asaas (automático)" : "Manual"}</td>
+                        <td className="num">
+                          {formatBRL(s.amount_cents)}
+                          {s.interest_cents > 0 ? <span className="muted"> + juros {formatBRL(s.interest_cents)}</span> : null}
+                        </td>
+                        <td>
+                          {s.source === "manual" && !s.reversed_at ? (
+                            <form action={reverseSettlement}>
+                              <input type="hidden" name="id" value={id} />
+                              <input type="hidden" name="settlement_id" value={s.id} />
+                              <button className="btn btn-secondary" style={{ padding: "3px 8px", fontSize: 12 }}>
+                                Estornar
+                              </button>
+                            </form>
+                          ) : s.reversed_at ? (
+                            <span className="muted">estornado</span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+            </div>
+          );
+        })
       )}
     </Shell>
   );
