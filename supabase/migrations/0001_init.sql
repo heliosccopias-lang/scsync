@@ -94,6 +94,7 @@ create table technicians (
   updated_at timestamptz not null default now()
 );
 create index on technicians (org_id, active);
+create index on technicians (user_id);
 
 create table catalog_items (
   id uuid primary key default gen_random_uuid(),
@@ -128,6 +129,7 @@ create table price_list_items (
   primary key (price_list_id, catalog_item_id)
 );
 create index on price_list_items (catalog_item_id);
+create index on price_list_items (org_id);
 
 create table rejection_reasons (
   id uuid primary key default gen_random_uuid(),
@@ -239,6 +241,7 @@ create index on service_orders (second_technician_id);
 create index on service_orders (price_list_id);
 create index on service_orders (payment_condition_id);
 create index on service_orders (bank_account_id);
+create index on service_orders (created_by);
 
 create table service_order_items (
   id uuid primary key default gen_random_uuid(),
@@ -259,6 +262,7 @@ create table service_order_items (
 create index on service_order_items (service_order_id, position);
 create index on service_order_items (catalog_item_id);
 create index on service_order_items (rejection_reason_id);
+create index on service_order_items (org_id);
 
 create table service_order_item_technicians (
   item_id uuid not null references service_order_items(id) on delete cascade,
@@ -267,6 +271,7 @@ create table service_order_item_technicians (
   primary key (item_id, technician_id)
 );
 create index on service_order_item_technicians (technician_id);
+create index on service_order_item_technicians (org_id);
 
 create table service_order_installments (
   id uuid primary key default gen_random_uuid(),
@@ -279,6 +284,7 @@ create table service_order_installments (
   notes text,
   unique (service_order_id, number)
 );
+create index on service_order_installments (org_id);
 
 create table attachments (
   id uuid primary key default gen_random_uuid(),
@@ -321,6 +327,7 @@ create table checklist_questions (
   comment_required_options jsonb not null default '[]'
 );
 create index on checklist_questions (checklist_id, position);
+create index on checklist_questions (org_id);
 
 create table checklist_runs (
   id uuid primary key default gen_random_uuid(),
@@ -332,6 +339,7 @@ create table checklist_runs (
   unique (service_order_id, checklist_id)
 );
 create index on checklist_runs (checklist_id);
+create index on checklist_runs (org_id);
 
 create table checklist_answers (
   run_id uuid not null references checklist_runs(id) on delete cascade,
@@ -344,6 +352,8 @@ create table checklist_answers (
   primary key (run_id, question_id)
 );
 create index on checklist_answers (question_id);
+create index on checklist_answers (org_id);
+create index on checklist_answers (answered_by);
 
 -- ---------------------------------------------------------------------------
 -- Contas a receber / pagar
@@ -459,6 +469,7 @@ create table charges (
 );
 create unique index charges_one_live_per_receivable on charges (receivable_id)
   where status not in ('cancelled','refunded');
+create index on charges (receivable_id);
 create index on charges (org_id, status);
 
 create table settlements (
@@ -484,6 +495,9 @@ create index on settlements (receivable_id);
 create index on settlements (payable_id);
 create index on settlements (org_id, paid_on);
 create index on settlements (webhook_event_id);
+create index on settlements (charge_id);
+create index on settlements (reversed_by);
+create index on settlements (created_by);
 -- A charge can settle its receivable once (webhooks repeat; CONFIRMED and RECEIVED both arrive).
 create unique index settlements_one_per_charge on settlements (charge_id)
   where charge_id is not null and reversed_at is null;
@@ -507,6 +521,7 @@ create table statement_imports (
 );
 create index on statement_imports (bank_account_id, imported_at desc);
 create index on statement_imports (org_id);
+create index on statement_imports (imported_by);
 
 create table statement_lines (
   id uuid primary key default gen_random_uuid(),
@@ -542,12 +557,13 @@ create table reconciliations (
 create index on reconciliations (statement_line_id);
 create index on reconciliations (target_type, target_id);
 create index on reconciliations (org_id, created_at desc);
+create index on reconciliations (matched_by);
 
 -- ---------------------------------------------------------------------------
 -- Money integrity: paid_cents and status follow settlements, inside the same transaction.
 -- ---------------------------------------------------------------------------
 create or replace function refresh_titulo_balance() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 declare
   r_id uuid := coalesce(new.receivable_id, old.receivable_id);
   p_id uuid := coalesce(new.payable_id, old.payable_id);
@@ -614,7 +630,7 @@ select so.id as service_order_id,
 -- ---------------------------------------------------------------------------
 create or replace function is_org_member(target uuid) returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from org_members m where m.org_id = target and m.user_id = auth.uid())
+  select exists (select 1 from org_members m where m.org_id = target and m.user_id = (select auth.uid()))
 $$;
 
 alter table orgs enable row level security;

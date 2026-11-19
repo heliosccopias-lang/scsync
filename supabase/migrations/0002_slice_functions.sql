@@ -212,9 +212,6 @@ begin
   return 'applied';
 end $$;
 
-revoke all on function apply_asaas_event(uuid, jsonb) from public;
-revoke all on function create_org(text, text) from public;
-
 -- Default category used by launch_accounts.
 create or replace function seed_org_defaults() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -225,13 +222,19 @@ begin
 end $$;
 create trigger orgs_seed_defaults after insert on orgs for each row execute function seed_org_defaults();
 
--- Supabase grants EXECUTE to anon/authenticated by default: take the webhook function away from them.
+-- Supabase grants EXECUTE to anon/authenticated by default: narrow it down.
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
-    revoke execute on function apply_asaas_event(uuid, jsonb) from anon, authenticated;
-    revoke execute on function create_org(text, text) from anon;
-    grant execute on function create_org(text, text) to authenticated;
+    revoke execute on function apply_asaas_event(uuid, jsonb) from public, anon, authenticated;
     grant execute on function apply_asaas_event(uuid, jsonb) to service_role;
+    revoke execute on function create_org(text, text) from public, anon;
+    grant execute on function create_org(text, text) to authenticated;
+    revoke execute on function seed_org_defaults() from public, anon, authenticated;
+    revoke execute on function refresh_titulo_balance() from public, anon, authenticated;
+    revoke execute on function create_service_order(uuid, jsonb) from public, anon;
+    grant execute on function create_service_order(uuid, jsonb) to authenticated;
+    revoke execute on function launch_accounts(uuid) from public, anon;
+    grant execute on function launch_accounts(uuid) to authenticated;
   end if;
 end $$;
