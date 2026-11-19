@@ -69,6 +69,7 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
               <th>Status</th>
               <th>Pagamento</th>
               <th className="num">Total</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -84,6 +85,11 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
                   <PaymentPill status={payBy.get(r.id) ?? "not_billed"} />
                 </td>
                 <td className="num">{formatBRL(r.total_cents)}</td>
+                <td>
+                  <Link href={`/os/${r.id}/imprimir`} aria-label={`Imprimir OS ${r.number}`}>
+                    Imprimir
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

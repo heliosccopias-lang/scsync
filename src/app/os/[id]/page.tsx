@@ -118,6 +118,9 @@ export default async function ServiceOrderPage({
           </h1>
         </div>
         <form action={setStatus} className="row">
+          <Link href={`/os/${id}/imprimir`} className="btn btn-primary">
+            Imprimir OS
+          </Link>
           <input type="hidden" name="id" value={id} />
           <select name="status" defaultValue={os.status} aria-label="Status da OS" style={{ width: 190 }}>
             {["open", "approved", "in_progress", "waiting_parts", "done", "delivered", "cancelled"].map((s) => (
