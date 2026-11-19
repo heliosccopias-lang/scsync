@@ -6,13 +6,21 @@ export function formatBRL(cents: number | bigint | null | undefined): string {
   return brl.format(Number(cents ?? 0) / 100);
 }
 
-/** Parses "1.234,56", "1234,56", "1234.56" or "1234" into centavos. Returns null if invalid. */
+/**
+ * Parses what people type in Brazil into centavos: "1.234,56", "1234,56", "1.500" (mil e quinhentos),
+ * "1234.56", "R$ 99,9", "150". Returns null if invalid.
+ */
 export function parseBRL(input: string): number | null {
-  const s = input.replace(/[R$\s]/g, "").trim();
+  const s = input.replace(/[R$\s ]/g, "").trim();
   if (!s) return null;
   let normalized: string;
   if (s.includes(",")) {
+    // comma is the decimal separator; dots are thousands
+    if (!/^-?\d{1,3}(\.\d{3})*(,\d{1,2})?$|^-?\d+(,\d{1,2})?$/.test(s)) return null;
     normalized = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
+    // "1.500" or "12.000.000": dots as thousands separators
+    normalized = s.replace(/\./g, "");
   } else {
     normalized = s;
   }
@@ -20,6 +28,15 @@ export function parseBRL(input: string): number | null {
   const [int, frac = ""] = normalized.replace("-", "").split(".");
   const cents = Number(int) * 100 + Number((frac + "00").slice(0, 2));
   return normalized.startsWith("-") ? -cents : cents;
+}
+
+/** Parses a quantity like "1", "2,5", "0.75". Returns null if not a positive number with up to 3 decimals. */
+export function parseQuantity(input: string): number | null {
+  const s = input.trim().replace(",", ".");
+  if (!s) return 1;
+  if (!/^\d+(\.\d{1,3})?$/.test(s)) return null;
+  const n = Number(s);
+  return n > 0 ? n : null;
 }
 
 /** Splits a total into n installments; the last one takes the rounding remainder. */

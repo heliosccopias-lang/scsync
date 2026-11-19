@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AsaasClient, billingTypeFor, webhookUrl } from "../src/lib/asaas";
 import { decryptSecret, encryptSecret, newWebhookToken, sha256, tokenMatchesHash } from "../src/lib/crypto";
-import { addMonths, formatBRL, parseBRL, splitInstallments, todayInSaoPaulo } from "../src/lib/money";
+import { addMonths, formatBRL, parseBRL, parseQuantity, splitInstallments, todayInSaoPaulo } from "../src/lib/money";
 
 describe("money", () => {
   it("parses Brazilian amounts into centavos", () => {
@@ -13,6 +13,23 @@ describe("money", () => {
     expect(parseBRL("abc")).toBeNull();
     expect(parseBRL("1,234")).toBeNull();
     expect(parseBRL("")).toBeNull();
+  });
+
+  it("reads dots as thousands the way people type in Brazil", () => {
+    expect(parseBRL("1.500")).toBe(150000);
+    expect(parseBRL("12.000.000")).toBe(1200000000);
+    expect(parseBRL("1.500,00")).toBe(150000);
+    expect(parseBRL("150.5")).toBe(15050);
+    expect(parseBRL("R$\u00a0150,00")).toBe(15000);
+    expect(parseBRL("1.50,00")).toBeNull();
+  });
+
+  it("parses quantities", () => {
+    expect(parseQuantity("")).toBe(1);
+    expect(parseQuantity("2")).toBe(2);
+    expect(parseQuantity("2,5")).toBe(2.5);
+    expect(parseQuantity("0")).toBeNull();
+    expect(parseQuantity("dois")).toBeNull();
   });
 
   it("splits installments with the remainder on the last one", () => {
