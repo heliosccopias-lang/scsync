@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Notice, Shell } from "@/components/Shell";
 import { formatBRL, parseBRL } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
+import { decodeCsv, parseCsv, planCatalogImport } from "@/lib/catalog-import";
 
 function back(key: "error" | "ok", msg: string, tipo?: string): never {
   redirect(`/cadastros/itens?${tipo ? `tipo=${tipo}&` : ""}${key}=${encodeURIComponent(msg)}`);
@@ -23,6 +24,60 @@ async function save(form: FormData) {
     : await sb.from("catalog_items").insert(row);
   if (error) back("error", error.code === "23505" ? `Já existe um ${kind === "service" ? "serviço" : "produto"} com esse nome.` : "Não foi possível salvar.", kind);
   back("ok", id ? "Item atualizado." : "Item cadastrado.", kind);
+}
+
+async function importCsv(form: FormData) {
+  "use server";
+  const { sb, orgId } = await requireOrg();
+  const kind = form.get("kind") === "product" ? "product" : "service";
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) back("error", "Escolha o arquivo CSV.", kind);
+  if (file.size > 1024 * 1024) back("error", "Arquivo maior que 1 MB. Divida a planilha em partes.", kind);
+  if (/\.xlsx?$/i.test(file.name)) back("error", "Esse arquivo é do Excel (.xlsx). No Excel, use Arquivo → Salvar como → CSV (separado por vírgulas) e importe o .csv.", kind);
+
+  const plan = planCatalogImport(parseCsv(decodeCsv(new Uint8Array(await file.arrayBuffer()))), kind);
+  const problems = plan.errors.length
+    ? ` ${plan.errors.length} linha(s) ignorada(s): ${plan.errors.slice(0, 5).join(" ")}${plan.errors.length > 5 ? " …" : ""}`
+    : "";
+  if (!plan.items.length) back("error", `Nada para importar.${problems}`, kind);
+
+  const { data: existing, error: readError } = await sb.from("catalog_items").select("id, kind, name").eq("org_id", orgId).limit(20000);
+  if (readError) back("error", "Não foi possível ler o cadastro atual.", kind);
+  const ids = new Map((existing ?? []).map((e) => [`${e.kind}|${String(e.name).toLowerCase()}`, e.id as string]));
+  const now = new Date().toISOString();
+
+  const inserts = plan.items
+    .filter((i) => !ids.has(`${i.kind}|${i.name.toLowerCase()}`))
+    .map((i) => ({ org_id: orgId, kind: i.kind, name: i.name, unit: i.unit ?? "un", price_cents: i.price_cents ?? 0, updated_at: now }));
+  const updates = plan.items
+    .map((i) => ({ i, id: ids.get(`${i.kind}|${i.name.toLowerCase()}`) }))
+    .filter((u): u is { i: (typeof plan.items)[number]; id: string } => !!u.id);
+
+  let failed = 0;
+  for (let k = 0; k < inserts.length; k += 500) {
+    const { error } = await sb.from("catalog_items").insert(inserts.slice(k, k + 500));
+    if (error) failed += Math.min(500, inserts.length - k);
+  }
+  for (let k = 0; k < updates.length; k += 25) {
+    const results = await Promise.all(
+      updates.slice(k, k + 25).map(({ i, id }) =>
+        sb
+          .from("catalog_items")
+          .update({
+            active: true,
+            updated_at: now,
+            ...(i.unit !== null ? { unit: i.unit } : {}),
+            ...(i.price_cents !== null ? { price_cents: i.price_cents } : {}),
+          })
+          .eq("id", id)
+          .eq("org_id", orgId),
+      ),
+    );
+    failed += results.filter((r) => r.error).length;
+  }
+  const done = `Importação concluída: ${inserts.length} novo(s), ${updates.length} atualizado(s).`;
+  const fail = failed ? ` ${failed} item(ns) não foram salvos; tente importar de novo.` : "";
+  back(failed ? "error" : "ok", done + fail + problems, kind);
 }
 
 async function toggle(form: FormData) {
@@ -123,6 +178,23 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           <button className="btn btn-primary">Cadastrar</button>
         </div>
       </form>
+
+      <details className="card" style={{ marginBottom: 16 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600 }}>Importar planilha (CSV)</summary>
+        <form action={importCsv} style={{ marginTop: 12 }}>
+          <input type="hidden" name="kind" value={kind} />
+          <p className="muted" style={{ marginTop: 0, fontSize: 14 }}>
+            Colunas: <strong>Tipo</strong> (Serviço ou Produto), <strong>Nome</strong>, <strong>Unidade</strong> e <strong>Preço</strong>. Só o nome é obrigatório; sem a coluna Tipo, entra
+            tudo como {kind === "service" ? "serviço" : "produto"}. Item com o mesmo nome já cadastrado tem preço e unidade atualizados (célula vazia mantém o que já
+            está). No Excel, salve como <em>CSV (separado por vírgulas)</em>; no Google Planilhas, <em>Arquivo → Fazer download → CSV</em>.{" "}
+            <a href="/cadastros/itens/modelo">Baixar planilha modelo</a>
+          </p>
+          <div className="row" style={{ alignItems: "center" }}>
+            <input type="file" name="file" accept=".csv,text/csv" required style={{ width: "auto" }} />
+            <button className="btn btn-primary">Importar</button>
+          </div>
+        </form>
+      </details>
 
       {(items ?? []).length === 0 ? (
         <div className="card empty">Nenhum {kind === "service" ? "serviço" : "produto"} cadastrado ainda.</div>
