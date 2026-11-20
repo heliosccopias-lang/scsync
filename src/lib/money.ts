@@ -60,6 +60,13 @@ export function addMonths(isoDate: string, months: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** Adds days to an ISO date (YYYY-MM-DD), calendar arithmetic in UTC so no DST surprises. */
+export function addDays(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
+}
+
 /** Today's date in São Paulo as YYYY-MM-DD (never the server's UTC date). */
 export function todayInSaoPaulo(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now);

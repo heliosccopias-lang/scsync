@@ -10,11 +10,13 @@ export function NewOrderForm({
   customers,
   technicians,
   catalog,
+  conditions,
   today,
 }: {
   customers: { id: string; name: string }[];
   technicians: { id: string; name: string }[];
   catalog: CatalogEntry[];
+  conditions: { id: string; name: string }[];
   today: string;
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createOrder, {});
@@ -154,6 +156,19 @@ export function NewOrderForm({
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Pagamento</h2>
+        {conditions.length ? (
+          <div className="field">
+            <label htmlFor="condition_id">Condição de pagamento</label>
+            <select id="condition_id" name="condition_id" defaultValue={v.condition_id ?? ""}>
+              <option value="">— Definir abaixo (parcelas iguais mensais) —</option>
+              {conditions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <div className="grid2">
           <div className="field">
             <label htmlFor="method">Forma</label>

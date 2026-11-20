@@ -198,3 +198,24 @@ describe("OFX", () => {
     expect(st.transactions[0].counterpartDoc).toBe("11222333000181");
   });
 });
+
+describe("addDays", () => {
+  it("crosses months and leap years", async () => {
+    const { addDays } = await import("../src/lib/money");
+    expect(addDays("2026-11-20", 30)).toBe("2026-12-20");
+    expect(addDays("2028-02-28", 1)).toBe("2028-02-29");
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDays("2026-11-20", 0)).toBe("2026-11-20");
+  });
+});
+
+describe("CSV export", () => {
+  it("uses semicolons, comma decimals and quotes when needed", async () => {
+    const { toCsv } = await import("../src/lib/csv");
+    const csv = toCsv({ key: "x", title: "x", columns: ["Descrição", "Total"], numeric: [false, true], rows: [], raw: [["Tela; 15\"", "1500.50"], ["Película", 3]] });
+    expect(csv.startsWith("﻿")).toBe(true);
+    expect(csv).toContain('"Tela; 15"""');
+    expect(csv).toContain(";1500,50");
+    expect(csv).toContain("Película;3");
+  });
+});

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { parseItemRows } from "@/lib/items";
-import { addMonths, parseBRL, splitInstallments, todayInSaoPaulo } from "@/lib/money";
+import { addDays, addMonths, parseBRL, splitInstallments, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
 import { LINES } from "./constants";
 import { isValidCnpj, isValidCpf } from "@/lib/br";
@@ -35,12 +35,26 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
   const total = items.reduce((acc, it) => acc + Math.round(it.quantity * it.unit_price_cents), 0) - discount;
   if (total <= 0) return fail("O total da OS precisa ser maior que zero.", "discount");
 
-  const n = Number(s("installments") || "1");
+  // A saved payment condition (e.g. 30/60/90) overrides the manual fields.
+  let conditionDays: number[] | null = null;
+  let conditionMethod: string | null = null;
+  if (s("condition_id")) {
+    const { sb: csb } = await requireOrg();
+    const { data: cond } = await csb.from("payment_conditions").select("installment_days, default_method").eq("id", s("condition_id")).maybeSingle();
+    if (!cond) return fail("Condição de pagamento não encontrada.", "condition_id");
+    conditionDays = cond.installment_days as number[];
+    conditionMethod = cond.default_method as string;
+  }
+  const n = conditionDays ? conditionDays.length : Number(s("installments") || "1");
   if (!Number.isInteger(n) || n < 1 || n > 48) return fail("Número de parcelas entre 1 e 48.", "installments");
   const firstDue = s("first_due") || todayInSaoPaulo();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDue)) return fail("Data do 1º vencimento inválida.", "first_due");
   const method = ["pix", "boleto", "credit_card", "other"].includes(s("method")) ? s("method") : "pix";
-  const installments = splitInstallments(total, n).map((amount, i) => ({ due_date: addMonths(firstDue, i), amount_cents: amount, method }));
+  const installments = splitInstallments(total, n).map((amount, i) => ({
+    due_date: conditionDays ? addDays(todayInSaoPaulo(), conditionDays[i]) : addMonths(firstDue, i),
+    amount_cents: amount,
+    method: conditionMethod ?? method,
+  }));
 
   // 2. Save: customer (if new), then the OS in one database call.
   const { sb, orgId } = await requireOrg();

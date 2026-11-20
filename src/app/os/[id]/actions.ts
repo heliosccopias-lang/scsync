@@ -8,8 +8,10 @@ import { asaasFor, createChargeForReceivable, syncChargeFromAsaas } from "@/lib/
 import { parseBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
 
+/** `id` is an OS id, or a path starting with "/" when the same action is used from another screen (e.g. /receber/<id>). */
 function back(id: string, key: "error" | "ok", msg: string): never {
-  redirect(`/os/${id}?${key}=${encodeURIComponent(msg)}`);
+  const base = id.startsWith("/") && !id.startsWith("//") ? id : `/os/${id}`;
+  redirect(`${base}?${key}=${encodeURIComponent(msg)}`);
 }
 
 const ERRORS: Record<string, string> = {
@@ -136,7 +138,7 @@ export async function reverseSettlement(form: FormData) {
     .update({ reversed_at: new Date().toISOString(), reversed_by: user.id }, { count: "exact" })
     .eq("id", String(form.get("settlement_id")))
     .eq("org_id", orgId)
-    .eq("source", "manual")
+    .in("source", ["manual", "batch"])
     .is("reversed_at", null);
   if (error || !count) back(id, "error", "Não foi possível estornar. Recebimentos do Asaas se estornam no próprio Asaas.");
   back(id, "ok", "Recebimento estornado; o título voltou a ficar em aberto.");

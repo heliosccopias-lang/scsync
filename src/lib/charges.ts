@@ -70,6 +70,9 @@ export async function createChargeForReceivable(sb: UserClient, orgId: string, r
     );
   }
   const billingType = billingTypeFor(rec.method);
+  const { data: fees } = await sb.from("orgs").select("fine_pct, interest_month_pct").eq("id", orgId).single();
+  const fine = Number(fees?.fine_pct ?? 0);
+  const interest = Number(fees?.interest_month_pct ?? 0);
   const payment = await asaas.createPayment({
     customer: asaasCustomerId,
     billingType,
@@ -77,6 +80,8 @@ export async function createChargeForReceivable(sb: UserClient, orgId: string, r
     dueDate: rec.due_date,
     description: rec.name,
     externalReference: rec.id,
+    ...(fine > 0 ? { fine: { value: fine } } : {}),
+    ...(interest > 0 ? { interest: { value: interest } } : {}),
   });
 
   let pixPayload: string | null = null;

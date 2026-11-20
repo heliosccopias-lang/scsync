@@ -10,8 +10,15 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
         </div>
         <nav>
           <Link href="/os">Ordens de serviço</Link>
-          <Link href="/receber">Contas a receber</Link>
-          <Link href="/conciliacao">Conciliação</Link>
+          <details className="menu">
+            <summary>Financeiro</summary>
+            <div className="menu-list">
+              <Link href="/receber">Contas a receber</Link>
+              <Link href="/pagar">Contas a pagar</Link>
+              <Link href="/conciliacao">Conciliação bancária</Link>
+            </div>
+          </details>
+          <Link href="/relatorios">Relatórios</Link>
           <details className="menu">
             <summary>Cadastros</summary>
             <div className="menu-list">
@@ -26,6 +33,7 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
             <div className="menu-list">
               <Link href="/configuracoes/asaas">Conexão Asaas</Link>
               <Link href="/configuracoes/contas">Contas bancárias</Link>
+              <Link href="/configuracoes/financeiro">Juros, categorias e condições</Link>
             </div>
           </details>
         </nav>
