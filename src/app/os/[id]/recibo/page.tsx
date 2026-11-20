@@ -12,7 +12,7 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
 
   const { data: os } = await sb
     .from("service_orders")
-    .select("id, number, equipment, total_cents, customers(name, cpf_cnpj), orgs(name, cnpj)")
+    .select("id, number, total_cents, customers(name, cpf_cnpj), orgs(name, cnpj)")
     .eq("id", id)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -63,7 +63,7 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
               Recebemos de <strong>{c?.name}</strong>
               {c?.cpf_cnpj ? <> (CPF/CNPJ {fmtDoc(c.cpf_cnpj)})</> : null} a importância de <strong>{formatBRL(total)}</strong> ({centsInWords(total)}), referente
               à ordem de serviço nº {os.number}
-              {os.equipment ? <> ({os.equipment})</> : null}, conforme os pagamentos abaixo.
+              , conforme os pagamentos abaixo.
             </p>
             <table>
               <thead>

@@ -11,7 +11,7 @@ export default async function PrintChecklist({ params }: { params: Promise<{ id:
   const { sb, orgId } = await requireOrg();
   const { data: run } = await sb
     .from("checklist_runs")
-    .select("checklist_id, checklists(name), service_orders(number, equipment, customers(name), orgs(name))")
+    .select("checklist_id, checklists(name), service_orders(number, customers(name), orgs(name))")
     .eq("id", runId)
     .eq("org_id", orgId)
     .eq("service_order_id", id)
@@ -19,7 +19,7 @@ export default async function PrintChecklist({ params }: { params: Promise<{ id:
   if (!run) notFound();
   const { data: qrows } = await sb.from("checklist_questions").select("*").eq("checklist_id", run.checklist_id).order("position");
   const questions = (qrows ?? []) as Question[];
-  const os = run.service_orders as unknown as { number: number; equipment: string | null; customers: { name: string }; orgs: { name: string } };
+  const os = run.service_orders as unknown as { number: number; customers: { name: string }; orgs: { name: string } };
   const name = (run.checklists as unknown as { name: string }).name;
 
   return (
@@ -36,7 +36,6 @@ export default async function PrintChecklist({ params }: { params: Promise<{ id:
             <div className="company">{os.orgs.name}</div>
             <div className="muted">
               {os.customers.name}
-              {os.equipment ? ` · ${os.equipment}` : ""}
             </div>
           </div>
           <div className="doc-id">

@@ -240,16 +240,6 @@ export default async function ServiceOrderPage({
             <dd>{ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}</dd>
             <dt>Entrega prevista</dt>
             <dd>{fmtDay(os.delivery_date)}</dd>
-            <dt>Equipamento</dt>
-            <dd>{os.equipment ?? "—"}</dd>
-            <dt>Problema</dt>
-            <dd>{os.problem ?? "—"}</dd>
-            {os.receipt_notes ? (
-              <>
-                <dt>Recebimento</dt>
-                <dd>{os.receipt_notes}</dd>
-              </>
-            ) : null}
             {os.technical_report ? (
               <>
                 <dt>Laudo técnico</dt>
@@ -308,18 +298,6 @@ export default async function ServiceOrderPage({
                   <label htmlFor="d_delivery">Entrega prevista</label>
                   <input id="d_delivery" name="delivery_date" type="date" defaultValue={os.delivery_date ?? ""} />
                 </div>
-                <div className="field">
-                  <label htmlFor="d_equip">Equipamento</label>
-                  <input id="d_equip" name="equipment" defaultValue={os.equipment ?? ""} />
-                </div>
-              </div>
-              <div className="field">
-                <label htmlFor="d_problem">Problema relatado</label>
-                <input id="d_problem" name="problem" defaultValue={os.problem ?? ""} />
-              </div>
-              <div className="field">
-                <label htmlFor="d_receipt">Observações do recebimento</label>
-                <input id="d_receipt" name="receipt_notes" defaultValue={os.receipt_notes ?? ""} />
               </div>
               <div className="field">
                 <label htmlFor="d_report">Laudo técnico / diagnóstico</label>
@@ -472,7 +450,7 @@ export default async function ServiceOrderPage({
         <div className="card">
           <strong>Anexos</strong>
           <p className="muted" style={{ margin: "4px 0 8px", fontSize: 13 }}>
-            Fotos do equipamento, contrato, notas. Até 10 por vez, 5 MB cada.
+            Arte do cliente, provas, fotos, notas. Até 10 por vez, 5 MB cada.
           </p>
           <div className="row" style={{ marginBottom: 8 }}>
             {files.map((f) => (

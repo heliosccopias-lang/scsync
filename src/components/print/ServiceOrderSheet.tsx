@@ -96,20 +96,6 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
               {data.technician}
             </div>
           ) : null}
-          <div className="wide">
-            <span>Equipamento</span>
-            {os.equipment ?? "—"}
-          </div>
-          <div className="wide">
-            <span>Problema relatado</span>
-            {os.problem ?? "—"}
-          </div>
-          {os.receipt_notes ? (
-            <div className="wide">
-              <span>Observações do recebimento</span>
-              {os.receipt_notes}
-            </div>
-          ) : null}
           {os.technical_report ? (
             <div className="wide">
               <span>Laudo técnico</span>

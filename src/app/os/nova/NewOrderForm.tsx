@@ -116,20 +116,6 @@ export function NewOrderForm({
         </div>
         <div className="grid2">
           <div className="field">
-            <label htmlFor="equipment">Equipamento</label>
-            <input id="equipment" name="equipment" defaultValue={v.equipment} />
-          </div>
-          <div className="field">
-            <label htmlFor="problem">Problema relatado</label>
-            <input id="problem" name="problem" defaultValue={v.problem} />
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="receipt_notes">Observações do recebimento (estado em que o equipamento chegou, acessórios)</label>
-          <input id="receipt_notes" name="receipt_notes" defaultValue={v.receipt_notes} />
-        </div>
-        <div className="grid2">
-          <div className="field">
             <label htmlFor="notes">Observações (saem na OS do cliente)</label>
             <textarea id="notes" name="notes" defaultValue={v.notes} />
           </div>
