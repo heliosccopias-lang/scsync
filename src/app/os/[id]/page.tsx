@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Notice, PaymentPill, Shell, osStatusLabel } from "@/components/Shell";
 import { whatsappLink } from "@/lib/br";
+import { ASAAS_MIN_CHARGE_CENTS } from "@/lib/constants";
 import { formatBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
 import { charge, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
@@ -307,12 +308,17 @@ export default async function ServiceOrderPage({
 
               {open ? (
                 <div className="row" style={{ alignItems: "flex-start" }}>
-                  {!live ? (
+                  {!live && r.open_cents >= ASAAS_MIN_CHARGE_CENTS ? (
                     <form action={charge}>
                       <input type="hidden" name="id" value={id} />
                       <input type="hidden" name="receivable_id" value={r.id} />
                       <button className="btn btn-primary">Cobrar pelo Asaas (Pix / link)</button>
                     </form>
+                  ) : null}
+                  {!live && r.open_cents < ASAAS_MIN_CHARGE_CENTS ? (
+                    <span className="muted" style={{ alignSelf: "center" }}>
+                      Abaixo de {formatBRL(ASAAS_MIN_CHARGE_CENTS)} o Asaas não gera cobrança: receba na maquininha ou em dinheiro.
+                    </span>
                   ) : null}
                   <details style={{ flex: 1, minWidth: 280 }}>
                     <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>

@@ -1,7 +1,8 @@
 import "server-only";
 import { AsaasClient, billingTypeFor, type AsaasEnvironment, type AsaasPayment } from "./asaas";
 import { decryptSecret } from "./crypto";
-import { centsToReais } from "./money";
+import { ASAAS_MIN_CHARGE_CENTS } from "./constants";
+import { centsToReais, formatBRL } from "./money";
 import { supabaseAdmin } from "./supabase";
 
 type UserClient = Awaited<ReturnType<typeof import("./supabase").supabaseUser>>;
@@ -63,6 +64,11 @@ export async function createChargeForReceivable(sb: UserClient, orgId: string, r
   }
 
   const openCents = rec.amount_cents - rec.paid_cents;
+  if (openCents < ASAAS_MIN_CHARGE_CENTS) {
+    throw new Error(
+      `O Asaas só aceita cobranças a partir de ${formatBRL(ASAAS_MIN_CHARGE_CENTS)}. Esta parcela é de ${formatBRL(openCents)}: receba na maquininha ou em dinheiro.`,
+    );
+  }
   const billingType = billingTypeFor(rec.method);
   const payment = await asaas.createPayment({
     customer: asaasCustomerId,
