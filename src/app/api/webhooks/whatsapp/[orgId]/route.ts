@@ -5,6 +5,7 @@ import { HELP_TEXT, phoneKey, readInbound } from "@/lib/whatsapp";
 import { parseExpenseMessage } from "@/lib/card";
 import { formatBRL, todayInSaoPaulo } from "@/lib/money";
 import { fmtDate } from "@/lib/format";
+import { canSend, sendWhatsApp } from "@/lib/whatsapp-send";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ orgId: string 
   const { orgId } = await ctx.params;
   if (!UUID.test(orgId)) return NextResponse.json({ error: "not_found" }, { status: 404 });
   const admin = supabaseAdmin();
-  const { data: org } = await admin.from("orgs").select("id, wa_token_hash").eq("id", orgId).maybeSingle();
+  const { data: org } = await admin.from("orgs").select("id, wa_token_hash, wa_provider, wa_api_url, wa_instance, wa_api_token_encrypted, wa_client_token_encrypted").eq("id", orgId).maybeSingle();
   const token = new URL(req.url).searchParams.get("token") ?? req.headers.get("x-scsync-token");
   if (!org?.wa_token_hash || !tokenMatchesHash(token, org.wa_token_hash)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
@@ -64,14 +65,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ orgId: string 
     }
 
     const sender = (senders ?? []).find((s) => s.active && phoneKey(s.phone) === phoneKey(m.from));
-    let result: "saved" | "ignored" | "unauthorized" | "error" = "ignored";
+    let result: "saved" | "ignored" | "error" = "ignored";
     let reply: string;
     let expenseId: string | null = null;
     const cmd = m.text.trim().toLowerCase();
 
     if (!sender) {
-      result = "unauthorized";
-      reply = "Este número não está autorizado a lançar despesas. Peça para cadastrarem você no SCsync.";
+      // The connected number may be the company's own: never answer people who are not authorized.
+      await admin.from("whatsapp_inbox").update({ result: "unauthorized", text: null }).eq("id", inbox.id);
+      continue;
     } else if (["ajuda", "help", "menu", "oi", "olá", "ola"].includes(cmd)) {
       reply = HELP_TEXT;
     } else if (cmd === "cancelar") {
@@ -132,7 +134,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ orgId: string 
         }
       }
     }
-    await admin.from("whatsapp_inbox").update({ result, reply, expense_id: expenseId }).eq("id", inbox.id);
+    let sent: boolean | null = null;
+    if (canSend(org)) {
+      try {
+        await sendWhatsApp(org, m.from, reply);
+        sent = true;
+      } catch (e) {
+        sent = false;
+        console.error("whatsapp reply failed", { orgId, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    await admin.from("whatsapp_inbox").update({ result, reply, expense_id: expenseId, reply_sent: sent }).eq("id", inbox.id);
     replies.push({ to: m.from, text: reply });
   }
   return NextResponse.json({ received: true, replies });

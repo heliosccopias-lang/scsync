@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { Notice, Shell } from "@/components/Shell";
 import { CopyButton } from "@/components/CopyButton";
 import { requireOrg } from "@/lib/session";
-import { newWebhookToken, sha256 } from "@/lib/crypto";
+import { encryptSecret, newWebhookToken, sha256 } from "@/lib/crypto";
+import { WaSendError, canSend, sendWhatsApp, setWhatsAppWebhook } from "@/lib/whatsapp-send";
 import { HELP_TEXT } from "@/lib/whatsapp";
 import { fmtDate } from "@/lib/format";
 
@@ -25,6 +26,64 @@ async function generateToken(form: FormData) {
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (bypass) url.searchParams.set("x-vercel-protection-bypass", bypass);
   back("ok", "Endereço gerado. Copie agora: por segurança ele só aparece desta vez.", `&url=${encodeURIComponent(url.toString())}`);
+}
+
+function webhookUrlFor(orgId: string, token: string): string {
+  const url = new URL(`/api/webhooks/whatsapp/${orgId}`, process.env.APP_URL);
+  url.searchParams.set("token", token);
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (bypass) url.searchParams.set("x-vercel-protection-bypass", bypass);
+  return url.toString();
+}
+
+/** WhatsApp connected as a device (Z-API or Evolution): saves the credentials and points its webhook here. */
+async function connectDevice(form: FormData) {
+  "use server";
+  const { sb, orgId } = await requireOrg();
+  if (!process.env.APP_URL) back("error", "APP_URL não está configurada no servidor.");
+  const provider = form.get("provider") === "evolution" ? "evolution" : "zapi";
+  const instance = String(form.get("instance") ?? "").trim();
+  const apiToken = String(form.get("api_token") ?? "").trim();
+  const clientToken = String(form.get("client_token") ?? "").trim();
+  let apiUrl = String(form.get("api_url") ?? "").trim().replace(/\/+$/, "");
+  if (provider === "evolution" && apiUrl && !/^https?:\/\//i.test(apiUrl)) apiUrl = `https://${apiUrl}`;
+  if (!instance || !apiToken) back("error", provider === "zapi" ? "Informe o ID da instância e o Token da Z-API." : "Informe o nome da instância e a API key da Evolution.");
+  if (provider === "evolution" && !apiUrl) back("error", "Informe o endereço do servidor da Evolution API.");
+  const token = newWebhookToken();
+  const url = webhookUrlFor(orgId, token);
+  const { error } = await sb
+    .from("orgs")
+    .update({
+      wa_provider: provider,
+      wa_token_hash: sha256(token),
+      wa_instance: instance,
+      wa_api_url: provider === "evolution" ? apiUrl : null,
+      wa_api_token_encrypted: encryptSecret(apiToken),
+      wa_client_token_encrypted: clientToken ? encryptSecret(clientToken) : null,
+    })
+    .eq("id", orgId);
+  if (error) back("error", "Não foi possível salvar.");
+  try {
+    await setWhatsAppWebhook({ provider, apiUrl, instance, token: apiToken, clientToken }, url);
+  } catch (e) {
+    const why = e instanceof WaSendError ? e.message : "sem resposta";
+    back("error", `Credenciais salvas, mas o ${provider === "zapi" ? "Z-API" : "Evolution"} não aceitou configurar o webhook (${why}). Confira os dados, ou cole o endereço abaixo no painel em "Ao receber".`, `&url=${encodeURIComponent(url)}`);
+  }
+  back("ok", "WhatsApp conectado: as mensagens recebidas já chegam ao robô. Mande um teste abaixo.");
+}
+
+async function sendTest(form: FormData) {
+  "use server";
+  const { sb, orgId } = await requireOrg();
+  const { data: org } = await sb.from("orgs").select("wa_provider, wa_api_url, wa_instance, wa_api_token_encrypted, wa_client_token_encrypted").eq("id", orgId).single();
+  if (!canSend(org)) back("error", "Conecte o WhatsApp primeiro.");
+  const phone = String(form.get("phone") ?? "");
+  try {
+    await sendWhatsApp(org!, phone, `Olá! Sou o robô de despesas do SCsync.\n\n${HELP_TEXT}`);
+  } catch (e) {
+    back("error", `Não consegui enviar: ${e instanceof WaSendError ? e.message : "sem resposta"}. Confira se o celular está conectado (QR Code) no painel.`);
+  }
+  back("ok", "Mensagem de teste enviada. Responda no WhatsApp com uma despesa, por exemplo: gasolina 150,00");
 }
 
 async function saveSender(form: FormData) {
@@ -82,17 +141,21 @@ async function addCategory(form: FormData) {
 }
 
 const RESULT: Record<string, string> = { saved: "Registrada", ignored: "Respondida", unauthorized: "Número não autorizado", error: "Erro" };
-const PROVIDER: Record<string, string> = { generic: "Outro / automação (n8n, Make)", meta: "WhatsApp Cloud API (Meta)", zapi: "Z-API", evolution: "Evolution API" };
+const PROVIDER: Record<string, string> = { generic: "Outro / automação (n8n, Make)", meta: "WhatsApp Cloud API (Meta)", zapi: "Z-API (dispositivo conectado)", evolution: "Evolution API (dispositivo conectado)" };
 
 export default async function WhatsAppSettingsPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string; url?: string }> }) {
   const { error, ok, url } = await searchParams;
   const { sb, orgId, orgName } = await requireOrg();
   const [{ data: org }, { data: senders }, { data: cats }, { data: inbox }] = await Promise.all([
-    sb.from("orgs").select("wa_token_hash, wa_verify_token, wa_provider").eq("id", orgId).single(),
+    sb.from("orgs").select("wa_token_hash, wa_verify_token, wa_provider, wa_api_url, wa_instance, wa_api_token_encrypted, wa_client_token_encrypted").eq("id", orgId).single(),
     sb.from("whatsapp_senders").select("*").eq("org_id", orgId).order("name"),
     sb.from("financial_categories").select("id, name, keywords").eq("org_id", orgId).eq("direction", "out").order("name"),
-    sb.from("whatsapp_inbox").select("id, from_phone, text, result, reply, created_at").eq("org_id", orgId).order("created_at", { ascending: false }).limit(20),
+    sb.from("whatsapp_inbox").select("id, from_phone, text, result, reply, reply_sent, created_at").eq("org_id", orgId).order("created_at", { ascending: false }).limit(20),
   ]);
+
+  const connected = canSend(org) && !!org?.wa_token_hash;
+  // Messages from numbers that are not authorized are kept out of the list (they may be customers).
+  const shown = (inbox ?? []).filter((m) => m.result !== "unauthorized");
 
   return (
     <Shell orgName={orgName}>
@@ -100,39 +163,99 @@ export default async function WhatsAppSettingsPage({ searchParams }: { searchPar
       <Notice error={error} ok={ok} />
 
       <section className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>1. Ligar o robô ao seu serviço de WhatsApp</h2>
+        <h2 style={{ marginTop: 0 }}>1. Conectar o WhatsApp (dispositivo conectado)</h2>
+        {connected ? (
+          <div className="notice notice-ok">
+            Conectado pela {org?.wa_provider === "zapi" ? "Z-API" : "Evolution API"} (instância {org?.wa_instance}). O robô recebe as mensagens e responde pelo próprio número.
+          </div>
+        ) : null}
         {url ? (
-          <div className="notice notice-ok" style={{ wordBreak: "break-all" }}>
-            <strong>Endereço do webhook (copie e cole no serviço de WhatsApp):</strong>
+          <div className={`notice ${error ? "notice-error" : "notice-ok"}`} style={{ wordBreak: "break-all" }}>
+            <strong>Endereço do webhook (cole no serviço, em &ldquo;Ao receber&rdquo;; só aparece agora):</strong>
             <div style={{ margin: "6px 0" }}>{url}</div>
             <CopyButton text={url} label="Copiar endereço" />
-            {org?.wa_provider === "meta" ? (
-              <div style={{ marginTop: 8 }}>
-                Na Meta, use também o <strong>Verify token</strong>: <code>{org.wa_verify_token}</code>
-              </div>
-            ) : null}
           </div>
-        ) : (
-          <p className="muted" style={{ marginTop: 0 }}>
-            {org?.wa_token_hash
-              ? `Robô ligado (${PROVIDER[org.wa_provider ?? "generic"]}). Gerar de novo troca o endereço: o antigo para de funcionar.`
-              : "Escolha o serviço e gere o endereço. Ele recebe as mensagens e devolve a resposta do robô."}
-          </p>
-        )}
-        <form action={generateToken} className="row">
-          <select name="provider" defaultValue={org?.wa_provider ?? "generic"} style={{ width: 300 }} aria-label="Serviço de WhatsApp">
-            {Object.entries(PROVIDER).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-primary">{org?.wa_token_hash ? "Gerar novo endereço" : "Gerar endereço do webhook"}</button>
-        </form>
-        <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-          O sistema entende as mensagens da Meta, Z-API e Evolution API. A resposta para quem mandou volta no corpo da resposta do webhook (
-          <code>replies</code>); o envio automático da confirmação pelo WhatsApp é ligado quando o serviço for escolhido.
+        ) : null}
+        <p className="muted" style={{ marginTop: 0 }}>
+          O número fica conectado como um aparelho (igual ao WhatsApp Web, pelo QR Code). Use de preferência um <strong>número só para o robô</strong>: ele
+          responde apenas aos números autorizados abaixo e ignora os outros em silêncio. Por não ser a API oficial, o WhatsApp pode bloquear números que mandam
+          muitas mensagens; para despesas internas o risco é baixo.
         </p>
+        <details open={!connected}>
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>Z-API</summary>
+          <form action={connectDevice} style={{ marginTop: 10 }}>
+            <input type="hidden" name="provider" value="zapi" />
+            <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+              No painel da Z-API: crie a instância, leia o QR Code com o celular do robô e copie o <em>ID da instância</em>, o <em>Token da instância</em> e o{" "}
+              <em>Client-Token</em> (aba Segurança).
+            </p>
+            <div className="grid2">
+              <div className="field">
+                <label htmlFor="z_inst">ID da instância</label>
+                <input id="z_inst" name="instance" defaultValue={org?.wa_provider === "zapi" ? (org?.wa_instance ?? "") : ""} autoComplete="off" />
+              </div>
+              <div className="field">
+                <label htmlFor="z_tok">Token da instância</label>
+                <input id="z_tok" name="api_token" type="password" autoComplete="off" />
+              </div>
+              <div className="field">
+                <label htmlFor="z_cli">Client-Token (segurança da conta)</label>
+                <input id="z_cli" name="client_token" type="password" autoComplete="off" />
+              </div>
+            </div>
+            <button className="btn btn-primary">Salvar e conectar</button>
+          </form>
+        </details>
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>Evolution API (servidor próprio)</summary>
+          <form action={connectDevice} style={{ marginTop: 10 }}>
+            <input type="hidden" name="provider" value="evolution" />
+            <div className="grid2">
+              <div className="field">
+                <label htmlFor="e_url">Endereço do servidor</label>
+                <input id="e_url" name="api_url" defaultValue={org?.wa_api_url ?? ""} placeholder="https://evolution.suaempresa.com.br" />
+              </div>
+              <div className="field">
+                <label htmlFor="e_inst">Nome da instância</label>
+                <input id="e_inst" name="instance" defaultValue={org?.wa_provider === "evolution" ? (org?.wa_instance ?? "") : ""} />
+              </div>
+              <div className="field">
+                <label htmlFor="e_key">API key</label>
+                <input id="e_key" name="api_token" type="password" autoComplete="off" />
+              </div>
+            </div>
+            <button className="btn btn-primary">Salvar e conectar</button>
+          </form>
+        </details>
+        {connected && (senders ?? []).some((x) => x.active) ? (
+          <form action={sendTest} className="row" style={{ marginTop: 12 }}>
+            <select name="phone" aria-label="Enviar teste para" style={{ width: 260 }}>
+              {(senders ?? [])
+                .filter((x) => x.active)
+                .map((x) => (
+                  <option key={x.id} value={x.phone}>
+                    {x.name} (+{x.phone})
+                  </option>
+                ))}
+            </select>
+            <button className="btn btn-secondary">Enviar mensagem de teste</button>
+          </form>
+        ) : null}
+        <details style={{ marginTop: 10 }}>
+          <summary className="muted" style={{ cursor: "pointer" }}>Outros serviços (API oficial da Meta, n8n, Make)</summary>
+          <form action={generateToken} className="row" style={{ marginTop: 10 }}>
+            <select name="provider" defaultValue="generic" style={{ width: 300 }} aria-label="Serviço">
+              <option value="generic">{PROVIDER.generic}</option>
+              <option value="meta">{PROVIDER.meta}</option>
+            </select>
+            <button className="btn btn-secondary">Gerar endereço do webhook</button>
+          </form>
+          {org?.wa_provider === "meta" && url ? (
+            <p>
+              Verify token da Meta: <code>{org.wa_verify_token}</code>
+            </p>
+          ) : null}
+        </details>
       </section>
 
       <section className="card" style={{ marginBottom: 16 }}>
@@ -194,7 +317,7 @@ export default async function WhatsAppSettingsPage({ searchParams }: { searchPar
 
       <section className="card">
         <h2 style={{ marginTop: 0 }}>Últimas mensagens</h2>
-        {(inbox ?? []).length === 0 ? (
+        {shown.length === 0 ? (
           <p className="muted">Nenhuma mensagem recebida ainda.</p>
         ) : (
           <table>
@@ -207,14 +330,17 @@ export default async function WhatsAppSettingsPage({ searchParams }: { searchPar
               </tr>
             </thead>
             <tbody>
-              {(inbox ?? []).map((m) => (
+              {shown.map((m) => (
                 <tr key={m.id}>
                   <td style={{ whiteSpace: "nowrap" }}>
                     {fmtDate(String(m.created_at).slice(0, 10))} {new Date(m.created_at).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })}
                   </td>
                   <td>+{m.from_phone}</td>
                   <td>{m.text}</td>
-                  <td title={m.reply ?? ""}>{RESULT[m.result] ?? m.result}</td>
+                  <td title={m.reply ?? ""}>
+                    {RESULT[m.result] ?? m.result}
+                    {m.reply_sent === false ? <div style={{ color: "var(--bad)", fontSize: 12 }}>resposta não enviada</div> : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
