@@ -18,7 +18,7 @@ async function save(form: FormData) {
   const osId = String(form.get("os_id"));
   const runId = String(form.get("run_id"));
   const finish = form.get("intent") === "finish";
-  const back = (key: "error" | "ok", msg: string): never => redirect(`/os/${osId}/checklist/${runId}?${key}=${encodeURIComponent(msg)}`);
+  const back: (key: "error" | "ok", msg: string) => never = (key, msg) => redirect(`/os/${osId}/checklist/${runId}?${key}=${encodeURIComponent(msg)}`);
   const { sb, orgId, user } = await requireOrg();
 
   const { data: run } = await sb.from("checklist_runs").select("id, checklist_id, status, checklists(mode)").eq("id", runId).eq("org_id", orgId).maybeSingle();
