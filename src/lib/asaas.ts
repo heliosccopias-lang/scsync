@@ -8,17 +8,20 @@ const BASE: Record<AsaasEnvironment, string> = {
   production: "https://api.asaas.com/v3",
 };
 
+// Only names from Asaas's documented list (docs.asaas.com/docs/webhook-para-cobrancas); an unknown name
+// makes Asaas reject the whole webhook. Cash receipts arrive as PAYMENT_RECEIVED.
 export const WEBHOOK_EVENTS = [
   "PAYMENT_CREATED",
   "PAYMENT_UPDATED",
   "PAYMENT_CONFIRMED",
   "PAYMENT_RECEIVED",
-  "PAYMENT_RECEIVED_IN_CASH",
   "PAYMENT_OVERDUE",
   "PAYMENT_DELETED",
+  "PAYMENT_RESTORED",
   "PAYMENT_REFUNDED",
+  "PAYMENT_PARTIALLY_REFUNDED",
+  "PAYMENT_RECEIVED_IN_CASH_UNDONE",
   "PAYMENT_CHARGEBACK_REQUESTED",
-  "PAYMENT_REVERSED",
 ] as const;
 
 export class AsaasError extends Error {

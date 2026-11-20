@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AsaasClient, billingTypeFor, webhookUrl } from "../src/lib/asaas";
+import { AsaasClient, billingTypeFor, WEBHOOK_EVENTS, webhookUrl } from "../src/lib/asaas";
 import { isValidCnpj, isValidCpf, whatsappLink, whatsappNumber } from "../src/lib/br";
 import { decryptSecret, encryptSecret, newWebhookToken, sha256, tokenMatchesHash } from "../src/lib/crypto";
 import { addMonths, formatBRL, parseBRL, parseQuantity, splitInstallments, todayInSaoPaulo } from "../src/lib/money";
@@ -100,6 +100,17 @@ describe("asaas client", () => {
     const client = new AsaasClient("k", "production", fetchMock as unknown as typeof fetch);
     await expect(client.createCustomer({ name: "A", cpfCnpj: "1" })).rejects.toMatchObject({ message: "CPF inválido", status: 400 });
     expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe("https://api.asaas.com/v3/customers");
+  });
+
+  it("subscribes only to webhook events Asaas documents", () => {
+    const documented = [
+      "PAYMENT_CREATED", "PAYMENT_AWAITING_RISK_ANALYSIS", "PAYMENT_APPROVED_BY_RISK_ANALYSIS", "PAYMENT_REPROVED_BY_RISK_ANALYSIS",
+      "PAYMENT_AUTHORIZED", "PAYMENT_UPDATED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED",
+      "PAYMENT_ANTICIPATED", "PAYMENT_OVERDUE", "PAYMENT_DELETED", "PAYMENT_RESTORED", "PAYMENT_REFUNDED",
+      "PAYMENT_PARTIALLY_REFUNDED", "PAYMENT_REFUND_IN_PROGRESS", "PAYMENT_REFUND_DENIED", "PAYMENT_RECEIVED_IN_CASH_UNDONE",
+      "PAYMENT_CHARGEBACK_REQUESTED", "PAYMENT_CHARGEBACK_DISPUTE", "PAYMENT_AWAITING_CHARGEBACK_REVERSAL",
+    ];
+    for (const e of WEBHOOK_EVENTS) expect(documented).toContain(e);
   });
 
   it("maps methods and builds the webhook URL with the Vercel bypass", () => {

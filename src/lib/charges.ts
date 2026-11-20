@@ -103,7 +103,7 @@ export async function createChargeForReceivable(sb: UserClient, orgId: string, r
 
 const STATUS_EVENT: Record<string, string> = {
   RECEIVED: "PAYMENT_RECEIVED",
-  RECEIVED_IN_CASH: "PAYMENT_RECEIVED_IN_CASH",
+  RECEIVED_IN_CASH: "PAYMENT_RECEIVED",
   CONFIRMED: "PAYMENT_CONFIRMED",
   OVERDUE: "PAYMENT_OVERDUE",
   REFUNDED: "PAYMENT_REFUNDED",

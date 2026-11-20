@@ -37,3 +37,12 @@ select payment_status, billed_cents, paid_cents from service_order_payment_view;
 select apply_asaas_event(:'org', '{"id":"evt_7","event":"PAYMENT_REFUNDED","payment":{"id":"pay_A","value":170.00}}');
 select payment_status, paid_cents from service_order_payment_view;
 select count(*) as events, count(*) filter (where processed_at is not null) as processed from webhook_events;
+-- cash undo reopens; restore after delete
+insert into charges(org_id,receivable_id,billing_type,asaas_payment_id,value_cents,due_date,status)
+select :'org', id, 'PIX', 'pay_C', amount_cents, due_date, 'cancelled' from receivables where name like '%1/2';
+select apply_asaas_event(:'org', '{"id":"evt_8","event":"PAYMENT_RESTORED","payment":{"id":"pay_C","value":170.00}}');
+select status from charges where asaas_payment_id='pay_C';
+select apply_asaas_event(:'org', '{"id":"evt_9","event":"PAYMENT_RECEIVED","payment":{"id":"pay_C","value":170.00,"billingType":"RECEIVED_IN_CASH"}}');
+select apply_asaas_event(:'org', '{"id":"evt_10","event":"PAYMENT_RECEIVED_IN_CASH_UNDONE","payment":{"id":"pay_C","value":170.00}}');
+select asaas_payment_id, status from charges order by 1;
+select payment_status, paid_cents from service_order_payment_view;
