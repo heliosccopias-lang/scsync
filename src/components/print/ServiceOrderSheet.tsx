@@ -16,6 +16,12 @@ export type SheetData = {
     notes: string | null;
     internal_notes?: string | null;
     receipt_notes: string | null;
+    print_format?: string | null;
+    print_paper?: string | null;
+    print_colors?: string | null;
+    finishing?: string[] | null;
+    art_approved?: boolean;
+    art_approved_at?: string | null;
     warranty: string | null;
     services_cents: number;
     products_cents: number;
@@ -102,6 +108,32 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
               <span style={{ whiteSpace: "pre-wrap", color: "inherit", fontSize: "inherit" }}>{os.technical_report}</span>
             </div>
           ) : null}
+        </div>
+      </section>
+
+      <section className="box">
+        <h3>Trabalho gráfico</h3>
+        <div className="grid">
+          <div>
+            <span>Formato / tamanho</span>
+            {os.print_format ?? "—"}
+          </div>
+          <div>
+            <span>Papel</span>
+            {os.print_paper ?? "—"}
+          </div>
+          <div>
+            <span>Cores</span>
+            {os.print_colors ?? "—"}
+          </div>
+          <div>
+            <span>Acabamento</span>
+            {os.finishing?.length ? os.finishing.join(", ") : "—"}
+          </div>
+          <div className="wide">
+            <span>Arte</span>
+            {os.art_approved ? `Aprovada pelo cliente${os.art_approved_at ? ` em ${fmtDate(os.art_approved_at)}` : ""}` : "Não aprovada — não imprimir sem aprovação"}
+          </div>
         </div>
       </section>
 

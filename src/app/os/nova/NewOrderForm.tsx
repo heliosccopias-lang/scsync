@@ -3,6 +3,8 @@
 import { useActionState, type FormEvent } from "react";
 import { createOrder, type FormState } from "./actions";
 import { LINES } from "./constants";
+import { PrintSpecFields } from "@/components/PrintSpecFields";
+import { readPrintSpec } from "@/lib/grafica";
 
 export type CatalogEntry = { id: string; kind: string; name: string; price_cents: number };
 
@@ -114,6 +116,7 @@ export function NewOrderForm({
             <input id="customer_phone" name="customer_phone" inputMode="tel" defaultValue={v.customer_phone} />
           </div>
         </div>
+        <PrintSpecFields d={readPrintSpec((k) => v[k] ?? "", v.art_approved_at ?? "")} />
         <div className="grid2">
           <div className="field">
             <label htmlFor="notes">Observações (saem na OS do cliente)</label>

@@ -6,6 +6,7 @@ import { addDays, addMonths, parseBRL, splitInstallments, todayInSaoPaulo } from
 import { requireOrg } from "@/lib/session";
 import { LINES } from "./constants";
 import { isValidCnpj, isValidCpf } from "@/lib/br";
+import { readPrintSpec } from "@/lib/grafica";
 
 
 export type FormState = { error?: string; field?: string; values?: Record<string, string> };
@@ -92,8 +93,8 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
     if (createdCustomer) await sb.from("customers").delete().eq("id", customerId).eq("org_id", orgId);
     return fail("Não foi possível salvar a OS. Tente de novo.");
   }
-  // Extra the creation function does not take: second technician.
-  const extra: Record<string, unknown> = {};
+  // Extras the creation function does not take: print-shop job specs and the second technician.
+  const extra: Record<string, unknown> = { ...readPrintSpec(s, todayInSaoPaulo()) };
   if (s("second_technician_id")) extra.second_technician_id = s("second_technician_id");
   if (Object.keys(extra).length) await sb.from("service_orders").update(extra).eq("id", osId).eq("org_id", orgId);
   redirect(`/os/${osId}`);

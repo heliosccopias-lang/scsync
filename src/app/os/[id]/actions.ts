@@ -7,6 +7,7 @@ import { onlyDigits, isValidCpfCnpj } from "@/lib/br";
 import { asaasFor, createChargeForReceivable, syncChargeFromAsaas } from "@/lib/charges";
 import { parseBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
+import { readPrintSpec } from "@/lib/grafica";
 
 /** `id` is an OS id, or a path starting with "/" when the same action is used from another screen (e.g. /receber/<id>). */
 function back(id: string, key: "error" | "ok", msg: string): never {
@@ -189,6 +190,7 @@ export async function updateDetails(form: FormData) {
       second_technician_id: s("second_technician_id"),
       delivery_date: delivery && /^\d{4}-\d{2}-\d{2}$/.test(delivery) ? delivery : null,
       attendance_type: attendance && ["internal", "external", "warranty"].includes(attendance) ? attendance : "external",
+      ...readPrintSpec((k) => String(form.get(k) ?? ""), todayInSaoPaulo()),
       technical_report: s("technical_report"),
       notes: s("notes"),
       internal_notes: s("internal_notes"),

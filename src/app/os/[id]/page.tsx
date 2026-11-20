@@ -11,6 +11,7 @@ import { asaasFor } from "@/lib/charges";
 import { ATTENDANCE_LABEL, fmtDate as fmtDay } from "@/lib/format";
 import { listAttachments, fmtSize } from "@/lib/attachments";
 import { Uploader } from "@/components/Uploader";
+import { PrintSpecFields } from "@/components/PrintSpecFields";
 import { registerOsFiles } from "./files-actions";
 import { stockAction, addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
 
@@ -240,6 +241,22 @@ export default async function ServiceOrderPage({
             <dd>{ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}</dd>
             <dt>Entrega prevista</dt>
             <dd>{fmtDay(os.delivery_date)}</dd>
+            <dt>Formato</dt>
+            <dd>{os.print_format ?? "—"}</dd>
+            <dt>Papel</dt>
+            <dd>{os.print_paper ?? "—"}</dd>
+            <dt>Cores</dt>
+            <dd>{os.print_colors ?? "—"}</dd>
+            <dt>Acabamento</dt>
+            <dd>{os.finishing?.length ? os.finishing.join(", ") : "—"}</dd>
+            <dt>Arte</dt>
+            <dd>
+              {os.art_approved ? (
+                <span style={{ color: "var(--ok)" }}>Aprovada{os.art_approved_at ? ` em ${fmtDay(os.art_approved_at)}` : ""}</span>
+              ) : (
+                <span style={{ color: "var(--bad)" }}>Não aprovada</span>
+              )}
+            </dd>
             {os.technical_report ? (
               <>
                 <dt>Laudo técnico</dt>
@@ -293,6 +310,7 @@ export default async function ServiceOrderPage({
                   <input id="d_delivery" name="delivery_date" type="date" defaultValue={os.delivery_date ?? ""} />
                 </div>
               </div>
+              <PrintSpecFields d={os} prefix="d_" />
               <div className="field">
                 <label htmlFor="d_report">Laudo técnico / diagnóstico</label>
                 <textarea id="d_report" name="technical_report" defaultValue={os.technical_report ?? ""} />
