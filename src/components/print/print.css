@@ -11,6 +11,12 @@
 .box { border: 1px solid #e3ddd4; border-radius: 6px; padding: 10px 12px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
 .grid .wide { grid-column: 1 / -1; }
+.grid4 { grid-template-columns: repeat(4, 1fr); }
+/* One compact line: "ATENDIMENTO  Tipo Externo · Previsão de entrega — · Técnico João" */
+.inline-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; padding: 7px 12px; }
+.inline-row h3 { margin: 0; }
+.inline-row span { font-size: 10.5px; color: #77746e; }
+.inline-row .wide { flex-basis: 100%; }
 .grid span, .totals span { display: block; font-size: 10.5px; color: #77746e; }
 .sheet table { border: 1px solid #e3ddd4; border-radius: 6px; }
 .sheet th { background: #f6f1ea; font-size: 10.5px; padding: 6px 8px; }

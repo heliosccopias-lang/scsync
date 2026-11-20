@@ -85,35 +85,29 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
         </div>
       </section>
 
-      <section className="box">
+      <section className="box inline-row">
         <h3>Atendimento</h3>
-        <div className="grid">
-          <div>
-            <span>Tipo</span>
-            {ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}
-          </div>
-          <div>
-            <span>Previsão de entrega</span>
-            {fmtDate(os.delivery_date)}
-          </div>
-          {data.technician ? (
-            <div>
-              <span>Técnico</span>
-              {data.technician}
-            </div>
-          ) : null}
-          {os.technical_report ? (
-            <div className="wide">
-              <span>Laudo técnico</span>
-              <span style={{ whiteSpace: "pre-wrap", color: "inherit", fontSize: "inherit" }}>{os.technical_report}</span>
-            </div>
-          ) : null}
+        <div>
+          <span>Tipo</span> {ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}
         </div>
+        <div>
+          <span>Previsão de entrega</span> {fmtDate(os.delivery_date)}
+        </div>
+        {data.technician ? (
+          <div>
+            <span>Técnico</span> {data.technician}
+          </div>
+        ) : null}
+        {os.technical_report ? (
+          <div className="wide">
+            <span>Laudo técnico</span> <span style={{ whiteSpace: "pre-wrap", color: "inherit", fontSize: "inherit" }}>{os.technical_report}</span>
+          </div>
+        ) : null}
       </section>
 
       <section className="box">
         <h3>Trabalho gráfico</h3>
-        <div className="grid">
+        <div className="grid grid4">
           <div>
             <span>Formato / tamanho</span>
             {os.print_format ?? "—"}
