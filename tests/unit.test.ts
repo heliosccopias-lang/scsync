@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AsaasClient, billingTypeFor, WEBHOOK_EVENTS, webhookUrl } from "../src/lib/asaas";
+import { parseItemRows } from "../src/lib/items";
 import { isValidCnpj, isValidCpf, whatsappLink, whatsappNumber } from "../src/lib/br";
 import { decryptSecret, encryptSecret, newWebhookToken, sha256, tokenMatchesHash } from "../src/lib/crypto";
 import { addMonths, formatBRL, parseBRL, parseQuantity, splitInstallments, todayInSaoPaulo } from "../src/lib/money";
@@ -139,5 +140,25 @@ describe("br", () => {
     expect(whatsappNumber("12345")).toBeNull();
     expect(whatsappLink("11987654321", "Olá & tchau")).toBe("https://wa.me/5511987654321?text=Ol%C3%A1%20%26%20tchau");
     expect(whatsappLink(null, "x")).toBeNull();
+  });
+});
+
+describe("item rows", () => {
+  it("skips empty rows and reads Brazilian values", () => {
+    const r = parseItemRows(
+      { item_kind_0: "service", item_desc_0: "Diagnóstico", item_qty_0: "1", item_price_0: "1,25", item_desc_1: "", item_price_1: "",
+        item_kind_2: "product", item_desc_2: "Tela", item_qty_2: "2", item_price_2: "1.500" },
+      3,
+    );
+    expect(r).toEqual({ items: [
+      { kind: "service", description: "Diagnóstico", quantity: 1, unit_price_cents: 125 },
+      { kind: "product", description: "Tela", quantity: 2, unit_price_cents: 150000 },
+    ] });
+  });
+
+  it("points at the field that is wrong", () => {
+    expect(parseItemRows({ item_desc_0: "Serviço", item_qty_0: "1", item_price_0: "" }, 1)).toMatchObject({ field: "item_price_0" });
+    expect(parseItemRows({ item_desc_0: "", item_price_0: "10" }, 1)).toMatchObject({ field: "item_desc_0" });
+    expect(parseItemRows({}, 2)).toMatchObject({ field: "item_desc_0" });
   });
 });

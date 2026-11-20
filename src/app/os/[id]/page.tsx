@@ -5,6 +5,7 @@ import { whatsappLink } from "@/lib/br";
 import { ASAAS_MIN_CHARGE_CENTS } from "@/lib/constants";
 import { formatBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
+import { EditItemsForm } from "./EditItemsForm";
 import { charge, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
 
 const METHOD: Record<string, string> = {
@@ -196,6 +197,19 @@ export default async function ServiceOrderPage({
           </tr>
         </tbody>
       </table>
+
+      {os.status !== "cancelled" ? (
+        <details style={{ marginTop: 12 }}>
+          <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>
+            Acrescentar ou editar serviços e produtos
+          </summary>
+          <EditItemsForm
+            osId={id}
+            discountCents={os.discount_cents}
+            items={(items ?? []).map((it) => ({ kind: it.kind, description: it.description, quantity: it.quantity, unit_price_cents: it.unit_price_cents }))}
+          />
+        </details>
+      ) : null}
 
       <div className="spread" style={{ marginTop: 28 }}>
         <h2 style={{ margin: 0 }}>Pagamento</h2>
