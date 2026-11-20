@@ -9,7 +9,7 @@ import { requireOrg } from "@/lib/session";
 export type EditItemsState = { error?: string; field?: string; values?: Record<string, string> };
 
 const ERRORS: Record<string, string> = {
-  below_paid: "O novo total ficou menor do que o cliente já pagou. Estorne um recebimento antes de reduzir o valor.",
+  already_launched: "As contas desta OS já foram lançadas: os itens não podem mais ser alterados.",
   cancelled: "OS cancelada não pode ser alterada.",
   total_not_positive: "O total da OS precisa ser maior que zero (confira o desconto).",
   total_below_installments: "O total ficou menor que o número de parcelas.",

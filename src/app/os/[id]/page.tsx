@@ -198,7 +198,11 @@ export default async function ServiceOrderPage({
         </tbody>
       </table>
 
-      {os.status !== "cancelled" ? (
+      {launched ? (
+        <p className="muted" style={{ marginTop: 10 }}>
+          Contas lançadas em {new Date(os.accounts_launched_at).toLocaleDateString("pt-BR")}: os serviços e produtos desta OS não podem mais ser alterados.
+        </p>
+      ) : os.status !== "cancelled" ? (
         <details style={{ marginTop: 12 }}>
           <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>
             Acrescentar ou editar serviços e produtos
@@ -214,8 +218,9 @@ export default async function ServiceOrderPage({
       <div className="spread" style={{ marginTop: 28 }}>
         <h2 style={{ margin: 0 }}>Pagamento</h2>
         {!launched && (installments ?? []).length > 0 ? (
-          <form action={launch}>
+          <form action={launch} className="row">
             <input type="hidden" name="id" value={id} />
+            <span className="muted" style={{ fontSize: 13 }}>Depois de lançar, os itens da OS ficam travados.</span>
             <button className="btn btn-primary">Lançar contas</button>
           </form>
         ) : null}

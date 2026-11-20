@@ -28,7 +28,7 @@ export function EditItemsForm({ osId, items, discountCents }: { osId: string; it
         </div>
       ) : null}
       <p className="muted" style={{ marginTop: 0 }}>
-        Altere, inclua ou apague linhas (deixe a descrição vazia para remover). Parcelas já pagas ficam como estão; a diferença vai para as parcelas em aberto, e a cobrança do Asaas é ajustada sozinha.
+        Altere, inclua ou apague linhas (deixe a descrição vazia para remover). As parcelas são recalculadas com o novo total, mantendo vencimentos e forma. Depois de lançar as contas, a OS fica travada.
       </p>
       <div className="row muted" style={{ fontSize: 12, marginBottom: 4, flexWrap: "nowrap" }}>
         <span style={{ width: 120 }}>Tipo</span>
