@@ -47,6 +47,16 @@ export interface AsaasPayment {
   externalReference?: string | null;
 }
 
+export interface AsaasStatementItem {
+  id: string;
+  value: number; // negative for money leaving the account
+  balance?: number;
+  type?: string;
+  date: string;
+  description?: string;
+  paymentId?: string | null;
+}
+
 export class AsaasClient {
   constructor(
     private apiKey: string,
@@ -98,6 +108,12 @@ export class AsaasClient {
     fine?: { value: number };
   }) {
     return this.request<AsaasPayment>("POST", "/payments", input);
+  }
+
+  /** Account statement (extrato), one page. Dates are YYYY-MM-DD. */
+  financialTransactions(startDate: string, finishDate: string, offset = 0, limit = 100) {
+    const q = new URLSearchParams({ startDate, finishDate, offset: String(offset), limit: String(limit) });
+    return this.request<{ data: AsaasStatementItem[]; hasMore?: boolean; totalCount?: number }>("GET", `/financialTransactions?${q}`);
   }
 
   /** Allowed while the charge is pending or overdue. Generates PAYMENT_UPDATED. */

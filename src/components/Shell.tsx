@@ -11,6 +11,7 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
         <nav>
           <Link href="/os">Ordens de serviço</Link>
           <Link href="/receber">Contas a receber</Link>
+          <Link href="/conciliacao">Conciliação</Link>
           <details className="menu">
             <summary>Cadastros</summary>
             <div className="menu-list">
@@ -23,6 +24,7 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
             <summary>Configurações</summary>
             <div className="menu-list">
               <Link href="/configuracoes/asaas">Conexão Asaas</Link>
+              <Link href="/configuracoes/contas">Contas bancárias</Link>
             </div>
           </details>
         </nav>

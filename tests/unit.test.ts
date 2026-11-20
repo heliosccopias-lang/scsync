@@ -177,3 +177,24 @@ describe("valor por extenso", () => {
     expect(centsInWords(102000)).toBe("mil e vinte reais");
   });
 });
+
+describe("OFX", () => {
+  it("reads a Windows-1252 SGML file from a Brazilian bank", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { decodeOfx, parseOfx } = await import("../src/lib/ofx");
+    const st = parseOfx(decodeOfx(readFileSync("tests/fixtures/bb-sgml.ofx")));
+    expect(st.accountId).toBe("12345-6");
+    expect(st.transactions).toHaveLength(3); // the zero-value line is skipped
+    expect(st.transactions[0]).toMatchObject({ postedOn: "2027-01-11", amountCents: 10000, counterpartDoc: "52998224725" });
+    expect(st.transactions[1]).toMatchObject({ amountCents: -1290, description: "TARIFA · TARIFA PACOTE SERVIÇOS" });
+    expect(st.transactions[2].fitId).toBe("202701120002#2"); // repeated FITID kept distinct
+  });
+
+  it("reads an XML OFX 2 file", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { decodeOfx, parseOfx } = await import("../src/lib/ofx");
+    const st = parseOfx(decodeOfx(readFileSync("tests/fixtures/xml.ofx")));
+    expect(st.transactions.map((t) => t.amountCents)).toEqual([10350, -50000]);
+    expect(st.transactions[0].counterpartDoc).toBe("11222333000181");
+  });
+});
