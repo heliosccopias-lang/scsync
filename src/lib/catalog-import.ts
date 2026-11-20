@@ -2,7 +2,7 @@
 
 export type Kind = "service" | "product";
 /** price_cents/unit null = cell left blank: keep what the item already has (new items get 0 and "un"). */
-export type ImportItem = { kind: Kind; name: string; unit: string | null; price_cents: number | null };
+export type ImportItem = { kind: Kind; code: string | null; name: string; unit: string | null; price_cents: number | null };
 export type ImportPlan = { items: ImportItem[]; errors: string[]; total: number };
 
 export const IMPORT_MAX_ROWS = 3000;
@@ -61,11 +61,22 @@ const norm = (s: string) =>
     .replace(/[^a-z0-9]/g, "");
 
 const HEADERS: Record<string, string[]> = {
-  kind: ["tipo", "categoria", "servicoouproduto"],
-  name: ["nome", "descricao", "produto", "servico", "item", "nomedoitem"],
-  unit: ["unidade", "un", "und", "unid"],
-  price: ["preco", "valor", "precovenda", "precodevenda", "valorunitario", "precounitario", "precors", "valorrs"],
+  kind: ["tipo", "categoria", "servicoouproduto", "produtoouservico"],
+  code: ["codigo", "cod", "codigodoproduto", "codigodoservico", "codigodoitem", "codproduto", "codigointerno", "sku", "referencia", "ref"],
+  name: ["nome", "descricao", "produto", "produtos", "servico", "servicos", "item", "nomedoitem", "nomedoproduto", "descricaodoproduto", "nomedoservico", "descricaodoservico", "produtoservico"],
+  unit: ["unidade", "un", "und", "unid", "unidadedemedida"],
+  price: ["preco", "valor", "precovenda", "precodevenda", "valorvenda", "valordevenda", "valorunitario", "precounitario", "precors", "valorrs", "vlvenda", "pvenda"],
 };
+
+/** Price column: an exact alias; else a "venda" column with valor/preço; else any valor/preço that is not cost. */
+function priceColumn(header: string[]): number {
+  const exact = header.findIndex((h) => HEADERS.price.includes(h));
+  if (exact >= 0) return exact;
+  const money = (h: string) => /valor|preco|vlr|^vl/.test(h);
+  const sale = header.findIndex((h) => money(h) && h.includes("venda"));
+  if (sale >= 0) return sale;
+  return header.findIndex((h) => money(h) && !/custo|compra/.test(h));
+}
 
 function parseKind(v: string, fallback: Kind): Kind | null {
   const k = norm(v);
@@ -81,13 +92,13 @@ export function parseImportPrice(v: string): number | null {
   if (!s) return 0;
   let n: string;
   if (s.includes(",")) {
-    if (!/^\d{1,3}(\.\d{3})*(,\d{1,2})?$|^\d+(,\d{1,2})?$/.test(s)) return null;
+    if (!/^\d{1,3}(\.\d{3})*(,\d+)?$|^\d+(,\d+)?$/.test(s)) return null;
     n = s.replace(/\./g, "").replace(",", ".");
   } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) n = s.replace(/\./g, "");
   else n = s;
-  if (!/^\d+(\.\d{1,2})?$/.test(n)) return null;
-  const [i, f = ""] = n.split(".");
-  return Number(i) * 100 + Number((f + "00").slice(0, 2));
+  if (!/^\d+(\.\d+)?$/.test(n)) return null;
+  // Spreadsheets often carry more decimals (2,505); round to the centavo.
+  return Math.round(Number(n) * 100);
 }
 
 /** Turns CSV rows (first row = header) into items to save, with readable errors by line number. */
@@ -98,9 +109,15 @@ export function planCatalogImport(rows: string[][], defaultKind: Kind): ImportPl
   const col = (field: string) => header.findIndex((h) => HEADERS[field].includes(h));
   const cName = col("name");
   const cKind = col("kind");
+  const cCode = col("code");
   const cUnit = col("unit");
-  const cPrice = col("price");
-  if (cName < 0) return { items: [], errors: ['Não achei a coluna "Nome" no cabeçalho. Use o modelo: Tipo; Nome; Unidade; Preço.'], total: 0 };
+  const cPrice = priceColumn(header);
+  // Without a Tipo column, a name column called "Produto" or "Serviço" says the kind.
+  if (cKind < 0 && cName >= 0) {
+    if (header[cName].startsWith("produto")) defaultKind = "product";
+    else if (header[cName].startsWith("servico")) defaultKind = "service";
+  }
+  if (cName < 0) return { items: [], errors: ['Não achei a coluna "Nome" no cabeçalho. Use o modelo: Código; Tipo; Nome; Unidade; Preço.'], total: 0 };
   if (rows.length - 1 > IMPORT_MAX_ROWS) return { items: [], errors: [`A planilha tem ${rows.length - 1} linhas; o máximo por importação é ${IMPORT_MAX_ROWS}.`], total: 0 };
 
   const byKey = new Map<string, ImportItem>();
@@ -128,12 +145,13 @@ export function planCatalogImport(rows: string[][], defaultKind: Kind): ImportPl
       continue;
     }
     const unit = get(cUnit).slice(0, 10) || null;
-    byKey.set(`${kind}|${name.toLowerCase()}`, { kind, name, unit, price_cents: price });
+    const code = get(cCode).slice(0, 40) || null;
+    byKey.set(code ? `${kind}|#${code.toLowerCase()}` : `${kind}|${name.toLowerCase()}`, { kind, code, name, unit, price_cents: price });
   }
   return { items: [...byKey.values()], errors, total: rows.length - 1 };
 }
 
 export const TEMPLATE_CSV =
   "﻿" +
-  ["Tipo;Nome;Unidade;Preço", "Serviço;Criação de arte;un;80,00", "Produto;Cartão de visita 9x5 couchê 300g 4x4 (milheiro);mil;150,00", "Produto;Impressão A4 colorida;fl;2,50"].join("\r\n") +
+  ["Código;Tipo;Nome;Unidade;Preço", "S001;Serviço;Criação de arte;un;80,00", "P001;Produto;Cartão de visita 9x5 couchê 300g 4x4 (milheiro);mil;150,00", "P002;Produto;Impressão A4 colorida;fl;2,50"].join("\r\n") +
   "\r\n";

@@ -15,14 +15,15 @@ async function save(form: FormData) {
   const kind = form.get("kind") === "product" ? "product" : "service";
   const name = String(form.get("name") ?? "").trim();
   const unit = String(form.get("unit") ?? "").trim() || "un";
+  const code = String(form.get("code") ?? "").trim().slice(0, 40) || null;
   const price = parseBRL(String(form.get("price") ?? "") || "0");
   if (!name) back("error", "Informe o nome.", kind);
   if (price === null || price < 0) back("error", "Preço inválido. Use, por exemplo, 150,00.", kind);
-  const row = { org_id: orgId, kind, name, unit, price_cents: price, updated_at: new Date().toISOString() };
+  const row = { org_id: orgId, kind, code, name, unit, price_cents: price, updated_at: new Date().toISOString() };
   const { error } = id
     ? await sb.from("catalog_items").update(row).eq("id", id).eq("org_id", orgId)
     : await sb.from("catalog_items").insert(row);
-  if (error) back("error", error.code === "23505" ? `Já existe um ${kind === "service" ? "serviço" : "produto"} com esse nome.` : "Não foi possível salvar.", kind);
+  if (error) back("error", error.code === "23505" ? `Já existe um ${kind === "service" ? "serviço" : "produto"} com esse nome ou código.` : "Não foi possível salvar.", kind);
   back("ok", id ? "Item atualizado." : "Item cadastrado.", kind);
 }
 
@@ -41,22 +42,30 @@ async function importCsv(form: FormData) {
     : "";
   if (!plan.items.length) back("error", `Nada para importar.${problems}`, kind);
 
-  const { data: existing, error: readError } = await sb.from("catalog_items").select("id, kind, name").eq("org_id", orgId).limit(20000);
+  const { data: existing, error: readError } = await sb.from("catalog_items").select("id, kind, code, name").eq("org_id", orgId).limit(20000);
   if (readError) back("error", "Não foi possível ler o cadastro atual.", kind);
-  const ids = new Map((existing ?? []).map((e) => [`${e.kind}|${String(e.name).toLowerCase()}`, e.id as string]));
+  const byName = new Map((existing ?? []).map((e) => [`${e.kind}|${String(e.name).toLowerCase()}`, e.id as string]));
+  const byCode = new Map((existing ?? []).filter((e) => e.code).map((e) => [`${e.kind}|${String(e.code).toLowerCase()}`, e.id as string]));
+  // Same code = same item (the name may have changed); otherwise same name.
+  const match = (i: (typeof plan.items)[number]) =>
+    (i.code ? byCode.get(`${i.kind}|${i.code.toLowerCase()}`) : undefined) ?? byName.get(`${i.kind}|${i.name.toLowerCase()}`);
   const now = new Date().toISOString();
 
   const inserts = plan.items
-    .filter((i) => !ids.has(`${i.kind}|${i.name.toLowerCase()}`))
-    .map((i) => ({ org_id: orgId, kind: i.kind, name: i.name, unit: i.unit ?? "un", price_cents: i.price_cents ?? 0, updated_at: now }));
+    .filter((i) => !match(i))
+    .map((i) => ({ org_id: orgId, kind: i.kind, code: i.code, name: i.name, unit: i.unit ?? "un", price_cents: i.price_cents ?? 0, updated_at: now }));
   const updates = plan.items
-    .map((i) => ({ i, id: ids.get(`${i.kind}|${i.name.toLowerCase()}`) }))
+    .map((i) => ({ i, id: match(i) }))
     .filter((u): u is { i: (typeof plan.items)[number]; id: string } => !!u.id);
 
   let failed = 0;
   for (let k = 0; k < inserts.length; k += 500) {
-    const { error } = await sb.from("catalog_items").insert(inserts.slice(k, k + 500));
-    if (error) failed += Math.min(500, inserts.length - k);
+    const chunk = inserts.slice(k, k + 500);
+    const { error } = await sb.from("catalog_items").insert(chunk);
+    if (error) {
+      // One bad row fails the whole batch: retry one by one so only that row is lost.
+      for (const row of chunk) if ((await sb.from("catalog_items").insert(row)).error) failed++;
+    }
   }
   for (let k = 0; k < updates.length; k += 25) {
     const results = await Promise.all(
@@ -66,6 +75,8 @@ async function importCsv(form: FormData) {
           .update({
             active: true,
             updated_at: now,
+            name: i.name,
+            ...(i.code !== null ? { code: i.code } : {}),
             ...(i.unit !== null ? { unit: i.unit } : {}),
             ...(i.price_cents !== null ? { price_cents: i.price_cents } : {}),
           })
@@ -134,8 +145,11 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const { tipo, q, error, ok } = await searchParams;
   const kind = tipo === "product" ? "product" : "service";
   const { sb, orgId, orgName } = await requireOrg();
-  let query = sb.from("catalog_items").select("id, kind, name, unit, price_cents, active, track_stock, stock_qty").eq("org_id", orgId).eq("kind", kind).order("active", { ascending: false }).order("name");
-  if (q) query = query.ilike("name", `%${q}%`);
+  let query = sb.from("catalog_items").select("id, kind, code, name, unit, price_cents, active, track_stock, stock_qty").eq("org_id", orgId).eq("kind", kind).order("active", { ascending: false }).order("name");
+  if (q) {
+    const term = q.replace(/[%,()]/g, " ").trim();
+    query = query.or(`name.ilike.%${term}%,code.ilike.%${term}%`);
+  }
   const [{ data: items }, { data: priceLists }] = await Promise.all([
     query.limit(500),
     sb.from("price_lists").select("attendance_type, adjust_pct").eq("org_id", orgId).not("attendance_type", "is", null),
@@ -155,7 +169,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         </a>
         <form className="row" style={{ marginLeft: "auto" }}>
           <input type="hidden" name="tipo" value={kind} />
-          <input name="q" placeholder="Buscar pelo nome" defaultValue={q} style={{ width: 220 }} />
+          <input name="q" placeholder="Buscar pelo nome ou código" defaultValue={q} style={{ width: 220 }} />
           <button className="btn btn-secondary">Buscar</button>
         </form>
       </div>
@@ -163,6 +177,10 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
       <form action={save} className="card" style={{ marginBottom: 16 }}>
         <input type="hidden" name="kind" value={kind} />
         <div className="row" style={{ alignItems: "flex-end", flexWrap: "nowrap" }}>
+          <div className="field" style={{ width: 110, marginBottom: 0 }}>
+            <label htmlFor="new_code">Código</label>
+            <input id="new_code" name="code" />
+          </div>
           <div className="field" style={{ flex: 3, marginBottom: 0 }}>
             <label htmlFor="new_name">Novo {kind === "service" ? "serviço" : "produto"}</label>
             <input id="new_name" name="name" placeholder={kind === "service" ? "Ex.: Troca de tela" : "Ex.: Tela 15 polegadas"} required />
@@ -184,9 +202,10 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         <form action={importCsv} style={{ marginTop: 12 }}>
           <input type="hidden" name="kind" value={kind} />
           <p className="muted" style={{ marginTop: 0, fontSize: 14 }}>
-            Colunas: <strong>Tipo</strong> (Serviço ou Produto), <strong>Nome</strong>, <strong>Unidade</strong> e <strong>Preço</strong>. Só o nome é obrigatório; sem a coluna Tipo, entra
-            tudo como {kind === "service" ? "serviço" : "produto"}. Item com o mesmo nome já cadastrado tem preço e unidade atualizados (célula vazia mantém o que já
-            está). No Excel, salve como <em>CSV (separado por vírgulas)</em>; no Google Planilhas, <em>Arquivo → Fazer download → CSV</em>.{" "}
+            Colunas, em qualquer ordem: <strong>Código</strong>, <strong>Tipo</strong> (Serviço ou Produto), <strong>Nome</strong> (ou Produto/Descrição),{" "}
+            <strong>Unidade</strong> e <strong>Preço</strong> (ou Valor de Venda). Só o nome é obrigatório. Sem a coluna Tipo, entra tudo como{" "}
+            {kind === "service" ? "serviço" : "produto"} (se a coluna do nome se chamar Produto, entra como produto). Item já cadastrado com o mesmo código ou
+            nome é atualizado; célula vazia mantém o que já está. No Excel, salve como <em>CSV (separado por vírgulas)</em>; no Google Planilhas, <em>Arquivo → Fazer download → CSV</em>.{" "}
             <a href="/cadastros/itens/modelo">Baixar planilha modelo</a>
           </p>
           <div className="row" style={{ alignItems: "center" }}>
@@ -216,13 +235,17 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                 <td colSpan={3} style={{ padding: 0 }}>
                   <details>
                     <summary style={{ display: "grid", gridTemplateColumns: "1fr 90px 140px", padding: "10px 12px", cursor: "pointer" }}>
-                      <span>{it.name}</span>
+                      <span>
+                        {it.code ? <span className="muted" style={{ marginRight: 8 }}>{it.code}</span> : null}
+                        {it.name}
+                      </span>
                       <span>{it.unit}</span>
                       <span style={{ textAlign: "right" }}>{formatBRL(it.price_cents)}</span>
                     </summary>
                     <form action={save} className="row" style={{ padding: "0 12px 12px", flexWrap: "nowrap" }}>
                       <input type="hidden" name="id" value={it.id} />
                       <input type="hidden" name="kind" value={it.kind} />
+                      <input name="code" defaultValue={it.code ?? ""} aria-label="Código" placeholder="Código" style={{ width: 100 }} />
                       <input name="name" defaultValue={it.name} aria-label="Nome" style={{ flex: 3 }} required />
                       <input name="unit" defaultValue={it.unit} aria-label="Unidade" style={{ width: 80 }} />
                       <input name="price" defaultValue={(it.price_cents / 100).toFixed(2).replace(".", ",")} aria-label="Preço" inputMode="decimal" style={{ width: 120 }} />
