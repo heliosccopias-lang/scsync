@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { addMonths, parseBRL, parseQuantity, splitInstallments, todayInSaoPaulo } from "@/lib/money";
+import { parseItemRows } from "@/lib/items";
+import { addMonths, parseBRL, splitInstallments, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
 import { LINES } from "./constants";
 import { isValidCnpj, isValidCpf } from "@/lib/br";
@@ -25,22 +26,9 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
     if (doc && !(isValidCpf(doc) || isValidCnpj(doc))) return fail("CPF/CNPJ inválido. Confira os números.", "customer_doc");
   }
 
-  const items: { kind: string; description: string; quantity: number; unit_price_cents: number }[] = [];
-  for (let i = 0; i < LINES; i++) {
-    const description = s(`item_desc_${i}`);
-    const rawPrice = s(`item_price_${i}`);
-    if (!description) {
-      if (rawPrice) return fail(`Item ${i + 1}: falta a descrição.`, `item_desc_${i}`);
-      continue;
-    }
-    const quantity = parseQuantity(s(`item_qty_${i}`));
-    if (quantity === null) return fail(`Item ${i + 1}: quantidade inválida. Use números, por exemplo 1 ou 2,5.`, `item_qty_${i}`);
-    if (!rawPrice) return fail(`Item ${i + 1}: informe o valor unitário, por exemplo 150,00.`, `item_price_${i}`);
-    const unit = parseBRL(rawPrice);
-    if (unit === null || unit < 0) return fail(`Item ${i + 1}: valor "${rawPrice}" não reconhecido. Use, por exemplo, 150,00 ou 1.500,00.`, `item_price_${i}`);
-    items.push({ kind: s(`item_kind_${i}`) === "product" ? "product" : "service", description, quantity, unit_price_cents: unit });
-  }
-  if (items.length === 0) return fail("Inclua pelo menos um serviço ou produto, com descrição e valor.", "item_desc_0");
+  const parsed = parseItemRows(values, LINES);
+  if ("error" in parsed) return fail(parsed.error, parsed.field);
+  const items = parsed.items;
 
   const discount = parseBRL(s("discount") || "0");
   if (discount === null || discount < 0) return fail("Desconto inválido. Use, por exemplo, 10,00.", "discount");
@@ -77,9 +65,14 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
       customer_id: customerId,
       kind: s("kind") === "quote" ? "quote" : "order",
       attendance_type: ["internal", "external", "warranty"].includes(s("attendance_type")) ? s("attendance_type") : "external",
+      technician_id: s("technician_id") || null,
+      delivery_date: /^\d{4}-\d{2}-\d{2}$/.test(s("delivery_date")) ? s("delivery_date") : null,
       equipment: s("equipment") || null,
       problem: s("problem") || null,
       notes: s("notes") || null,
+      internal_notes: s("internal_notes") || null,
+      receipt_notes: s("receipt_notes") || null,
+      warranty: s("warranty") || null,
       discount_cents: discount,
       items,
       installments,

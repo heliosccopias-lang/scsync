@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { CatalogList, fillFromCatalog, type CatalogEntry } from "../nova/NewOrderForm";
 import { updateItems, type EditItemsState } from "./items-action";
 
 type Item = { kind: string; description: string; quantity: number | string; unit_price_cents: number };
@@ -11,7 +12,7 @@ function money(cents: number) {
   return (cents / 100).toFixed(2).replace(".", ",");
 }
 
-export function EditItemsForm({ osId, items, discountCents }: { osId: string; items: Item[]; discountCents: number }) {
+export function EditItemsForm({ osId, items, discountCents, catalog }: { osId: string; items: Item[]; discountCents: number; catalog: CatalogEntry[] }) {
   const [state, action, pending] = useActionState<EditItemsState, FormData>(updateItems, {});
   const rows = items.length + EXTRA_ROWS;
   const sent = state.values;
@@ -19,7 +20,8 @@ export function EditItemsForm({ osId, items, discountCents }: { osId: string; it
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
 
   return (
-    <form action={action} key={JSON.stringify(sent ?? {})} className="card" style={{ marginTop: 10 }}>
+    <form action={action} key={JSON.stringify(sent ?? {})} className="card" style={{ marginTop: 10 }} onInput={(e) => fillFromCatalog(e, catalog)}>
+      <CatalogList catalog={catalog} />
       <input type="hidden" name="id" value={osId} />
       <input type="hidden" name="rows" value={rows} />
       {state.error ? (
@@ -46,6 +48,8 @@ export function EditItemsForm({ osId, items, discountCents }: { osId: string; it
             </select>
             <input
               name={`item_desc_${i}`}
+              list="catalog-items"
+              autoComplete="off"
               aria-label={`Descrição do item ${i + 1}`}
               placeholder={it ? "" : "Novo item"}
               defaultValue={val(`item_desc_${i}`, it?.description ?? "")}

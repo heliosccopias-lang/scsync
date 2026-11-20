@@ -16,6 +16,7 @@ const ERRORS: Record<string, string> = {
   no_installments: "A OS não tem parcelas.",
   installments_sum_mismatch: "A soma das parcelas não bate com o total da OS.",
   cancelled: "OS cancelada.",
+  is_quote: "Isto é um orçamento: aprove e converta em OS antes de lançar as contas.",
 };
 
 export async function launch(form: FormData) {
@@ -169,4 +170,45 @@ export async function updateCustomer(form: FormData) {
     }
   }
   back(id, "ok", "Cliente atualizado.");
+}
+
+/** Non-financial fields: allowed at any time, even after accounts are launched. */
+export async function updateDetails(form: FormData) {
+  const id = String(form.get("id"));
+  const { sb, orgId } = await requireOrg();
+  const s = (k: string) => String(form.get(k) ?? "").trim() || null;
+  const delivery = s("delivery_date");
+  const attendance = s("attendance_type");
+  const { error } = await sb
+    .from("service_orders")
+    .update({
+      technician_id: s("technician_id"),
+      delivery_date: delivery && /^\d{4}-\d{2}-\d{2}$/.test(delivery) ? delivery : null,
+      attendance_type: attendance && ["internal", "external", "warranty"].includes(attendance) ? attendance : "external",
+      equipment: s("equipment"),
+      problem: s("problem"),
+      receipt_notes: s("receipt_notes"),
+      technical_report: s("technical_report"),
+      notes: s("notes"),
+      internal_notes: s("internal_notes"),
+      warranty: s("warranty"),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("org_id", orgId);
+  if (error) back(id, "error", "Não foi possível salvar os dados da OS.");
+  back(id, "ok", "Dados da OS atualizados.");
+}
+
+export async function convertQuote(form: FormData) {
+  const id = String(form.get("id"));
+  const { sb, orgId } = await requireOrg();
+  const { error, count } = await sb
+    .from("service_orders")
+    .update({ kind: "order", status: "approved", updated_at: new Date().toISOString() }, { count: "exact" })
+    .eq("id", id)
+    .eq("org_id", orgId)
+    .eq("kind", "quote");
+  if (error || !count) back(id, "error", "Não foi possível converter o orçamento.");
+  back(id, "ok", "Orçamento aprovado e convertido em ordem de serviço. Agora você pode lançar as contas.");
 }

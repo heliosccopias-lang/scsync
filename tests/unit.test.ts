@@ -162,3 +162,18 @@ describe("item rows", () => {
     expect(parseItemRows({}, 2)).toMatchObject({ field: "item_desc_0" });
   });
 });
+
+describe("valor por extenso", () => {
+  it("writes amounts the way receipts do", async () => {
+    const { centsInWords } = await import("../src/lib/format");
+    expect(centsInWords(1250)).toBe("doze reais e cinquenta centavos");
+    expect(centsInWords(100)).toBe("um real");
+    expect(centsInWords(1)).toBe("um centavo");
+    expect(centsInWords(10000)).toBe("cem reais");
+    expect(centsInWords(10100)).toBe("cento e um reais");
+    expect(centsInWords(150000)).toBe("mil e quinhentos reais");
+    expect(centsInWords(123456)).toBe("mil duzentos e trinta e quatro reais e cinquenta e seis centavos");
+    expect(centsInWords(100000000)).toBe("um milhão de reais");
+    expect(centsInWords(102000)).toBe("mil e vinte reais");
+  });
+});

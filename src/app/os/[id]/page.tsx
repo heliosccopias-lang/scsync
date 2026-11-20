@@ -8,7 +8,8 @@ import { requireOrg } from "@/lib/session";
 import { EditItemsForm } from "./EditItemsForm";
 import { CopyButton } from "@/components/CopyButton";
 import { asaasFor } from "@/lib/charges";
-import { charge, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
+import { ATTENDANCE_LABEL, fmtDate as fmtDay } from "@/lib/format";
+import { charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
 
 const METHOD: Record<string, string> = {
   pix: "Pix",
@@ -47,13 +48,13 @@ export default async function ServiceOrderPage({
 
   const { data: os } = await sb
     .from("service_orders")
-    .select("*, customers(id, name, cpf_cnpj, email, phone)")
+    .select("*, customers(id, name, cpf_cnpj, email, phone), technicians!service_orders_technician_id_fkey(name)")
     .eq("id", id)
     .eq("org_id", orgId)
     .maybeSingle();
   if (!os) notFound();
 
-  const [{ data: items }, { data: installments }, { data: receivables }, { data: pay }] = await Promise.all([
+  const [{ data: items }, { data: installments }, { data: receivables }, { data: pay }, { data: technicians }, { data: catalog }] = await Promise.all([
     sb.from("service_order_items").select("*").eq("service_order_id", id).order("position"),
     sb.from("service_order_installments").select("*").eq("service_order_id", id).order("number"),
     sb
@@ -63,6 +64,8 @@ export default async function ServiceOrderPage({
       .eq("origin_id", id)
       .order("due_date"),
     sb.from("service_order_payment_view").select("payment_status").eq("service_order_id", id).maybeSingle(),
+    sb.from("technicians").select("id, name").eq("org_id", orgId).eq("active", true).order("name"),
+    sb.from("catalog_items").select("id, kind, name, price_cents").eq("org_id", orgId).eq("active", true).order("name").limit(2000),
   ]);
   const recIds = (receivables ?? []).map((r) => r.id);
   const [{ data: charges }, { data: settlements }] = recIds.length
@@ -105,6 +108,18 @@ export default async function ServiceOrderPage({
   const launched = Boolean(os.accounts_launched_at);
   const total = (receivables ?? []).length;
 
+  const appUrl = process.env.APP_URL ?? "https://scsync.vercel.app";
+  const publicUrl = `${appUrl}/p/${os.share_token}`;
+  const technicianName = (os.technicians as unknown as { name: string } | null)?.name ?? null;
+  const shareWa = whatsappLink(
+    (os.customers as unknown as { phone: string | null } | null)?.phone,
+    [
+      `Olá, ${(os.customers as unknown as { name: string } | null)?.name?.split(" ")[0] ?? ""}! Aqui é da ${orgName}.`,
+      `Segue ${os.kind === "quote" ? "o orçamento" : "a ordem de serviço"} nº ${os.number}, no valor de ${formatBRL(os.total_cents)}:`,
+      publicUrl,
+    ].join("\n"),
+  );
+
   return (
     <Shell orgName={orgName}>
       <div className="spread">
@@ -117,9 +132,22 @@ export default async function ServiceOrderPage({
           </h1>
         </div>
         <div className="row">
-          <Link href={`/os/${id}/imprimir`} className="btn btn-primary">
-            Imprimir OS
-          </Link>
+          {shareWa ? (
+            <a className="btn btn-primary" href={shareWa} target="_blank" rel="noreferrer">
+              Enviar {os.kind === "quote" ? "orçamento" : "OS"} por WhatsApp
+            </a>
+          ) : null}
+          <details className="menu-inline">
+            <summary className="btn btn-secondary">Imprimir ▾</summary>
+            <div className="menu-list">
+              <Link href={`/os/${id}/imprimir`}>{os.kind === "quote" ? "Orçamento" : "OS"} (via do cliente)</Link>
+              <Link href={`/os/${id}/imprimir?modo=producao`}>Ordem de produção (oficina)</Link>
+              <Link href={`/os/${id}/recibo`}>Recibo dos pagamentos</Link>
+              <a href={publicUrl} target="_blank" rel="noreferrer">
+                Abrir link do cliente
+              </a>
+            </div>
+          </details>
           <form action={setStatus} className="row">
             <input type="hidden" name="id" value={id} />
             <select name="status" defaultValue={os.status} aria-label="Status da OS" style={{ width: 190 }}>
@@ -134,6 +162,19 @@ export default async function ServiceOrderPage({
         </div>
       </div>
       <Notice error={error} ok={ok} />
+      {os.kind === "quote" ? (
+        <div className="notice" style={{ background: "var(--orange-soft)", color: "var(--ink)" }}>
+          <div className="spread" style={{ marginBottom: 0 }}>
+            <span>
+              <strong>Orçamento.</strong> Envie ao cliente; quando ele aprovar, converta em ordem de serviço para lançar as contas e cobrar.
+            </span>
+            <form action={convertQuote}>
+              <input type="hidden" name="id" value={id} />
+              <button className="btn btn-primary">Aprovar e converter em OS</button>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid2">
         <div className="card">
@@ -173,9 +214,105 @@ export default async function ServiceOrderPage({
           </details>
         </div>
         <div className="card">
-          <div className="muted">Equipamento / problema</div>
-          <strong>{os.equipment ?? "—"}</strong>
-          <div className="muted">{os.problem ?? ""}</div>
+          <div className="muted">Dados da OS</div>
+          <dl className="facts">
+            <dt>Técnico</dt>
+            <dd>{technicianName ?? "—"}</dd>
+            <dt>Atendimento</dt>
+            <dd>{ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}</dd>
+            <dt>Entrega prevista</dt>
+            <dd>{fmtDay(os.delivery_date)}</dd>
+            <dt>Equipamento</dt>
+            <dd>{os.equipment ?? "—"}</dd>
+            <dt>Problema</dt>
+            <dd>{os.problem ?? "—"}</dd>
+            {os.receipt_notes ? (
+              <>
+                <dt>Recebimento</dt>
+                <dd>{os.receipt_notes}</dd>
+              </>
+            ) : null}
+            {os.technical_report ? (
+              <>
+                <dt>Laudo técnico</dt>
+                <dd style={{ whiteSpace: "pre-wrap" }}>{os.technical_report}</dd>
+              </>
+            ) : null}
+            {os.warranty ? (
+              <>
+                <dt>Garantia</dt>
+                <dd>{os.warranty}</dd>
+              </>
+            ) : null}
+            {os.internal_notes ? (
+              <>
+                <dt>Obs. internas</dt>
+                <dd style={{ whiteSpace: "pre-wrap" }}>{os.internal_notes}</dd>
+              </>
+            ) : null}
+          </dl>
+          <details style={{ marginTop: 8 }}>
+            <summary>Editar dados da OS e laudo técnico</summary>
+            <form action={updateDetails} style={{ marginTop: 10 }}>
+              <input type="hidden" name="id" value={id} />
+              <div className="grid2">
+                <div className="field">
+                  <label htmlFor="d_tech">Técnico</label>
+                  <select id="d_tech" name="technician_id" defaultValue={os.technician_id ?? ""}>
+                    <option value="">— Nenhum —</option>
+                    {(technicians ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="d_att">Atendimento</label>
+                  <select id="d_att" name="attendance_type" defaultValue={os.attendance_type}>
+                    <option value="external">Externo</option>
+                    <option value="internal">Interno</option>
+                    <option value="warranty">Garantia</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="d_delivery">Entrega prevista</label>
+                  <input id="d_delivery" name="delivery_date" type="date" defaultValue={os.delivery_date ?? ""} />
+                </div>
+                <div className="field">
+                  <label htmlFor="d_equip">Equipamento</label>
+                  <input id="d_equip" name="equipment" defaultValue={os.equipment ?? ""} />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="d_problem">Problema relatado</label>
+                <input id="d_problem" name="problem" defaultValue={os.problem ?? ""} />
+              </div>
+              <div className="field">
+                <label htmlFor="d_receipt">Observações do recebimento</label>
+                <input id="d_receipt" name="receipt_notes" defaultValue={os.receipt_notes ?? ""} />
+              </div>
+              <div className="field">
+                <label htmlFor="d_report">Laudo técnico / diagnóstico</label>
+                <textarea id="d_report" name="technical_report" defaultValue={os.technical_report ?? ""} />
+              </div>
+              <div className="grid2">
+                <div className="field">
+                  <label htmlFor="d_notes">Observações (saem na OS)</label>
+                  <textarea id="d_notes" name="notes" defaultValue={os.notes ?? ""} />
+                </div>
+                <div className="field">
+                  <label htmlFor="d_internal">Observações internas</label>
+                  <textarea id="d_internal" name="internal_notes" defaultValue={os.internal_notes ?? ""} />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="d_warranty">Garantia</label>
+                <input id="d_warranty" name="warranty" defaultValue={os.warranty ?? ""} />
+              </div>
+              <button className="btn btn-secondary">Salvar dados</button>
+            </form>
+          </details>
         </div>
       </div>
 
@@ -229,6 +366,7 @@ export default async function ServiceOrderPage({
             Acrescentar ou editar serviços e produtos
           </summary>
           <EditItemsForm
+            catalog={catalog ?? []}
             osId={id}
             discountCents={os.discount_cents}
             items={(items ?? []).map((it) => ({ kind: it.kind, description: it.description, quantity: it.quantity, unit_price_cents: it.unit_price_cents }))}
@@ -238,7 +376,7 @@ export default async function ServiceOrderPage({
 
       <div className="spread" style={{ marginTop: 28 }}>
         <h2 style={{ margin: 0 }}>Pagamento</h2>
-        {!launched && (installments ?? []).length > 0 ? (
+        {!launched && os.kind !== "quote" && (installments ?? []).length > 0 ? (
           <form action={launch} className="row">
             <input type="hidden" name="id" value={id} />
             <span className="muted" style={{ fontSize: 13 }}>Depois de lançar, os itens da OS ficam travados.</span>

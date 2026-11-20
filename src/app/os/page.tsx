@@ -12,9 +12,9 @@ type Row = {
   customers: { name: string } | null;
 };
 
-export default async function ServiceOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+export default async function ServiceOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; cliente?: string }> }) {
   const { sb, orgId, orgName } = await requireOrg();
-  const { q, status } = await searchParams;
+  const { q, status, cliente } = await searchParams;
 
   let query = sb
     .from("service_orders")
@@ -23,6 +23,7 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
     .order("number", { ascending: false })
     .limit(100);
   if (status) query = query.eq("status", status);
+  if (cliente) query = query.eq("customer_id", cliente);
   if (q && /^\d+$/.test(q)) query = query.eq("number", Number(q));
   const { data: orders } = await query;
   const rows = ((orders ?? []) as unknown as Row[]).filter(

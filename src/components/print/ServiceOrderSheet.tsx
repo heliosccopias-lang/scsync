@@ -1,0 +1,246 @@
+import { osStatusLabel } from "@/components/Shell";
+import { ATTENDANCE_LABEL, METHOD_LABEL, fmtDate, fmtDoc } from "@/lib/format";
+import { formatBRL } from "@/lib/money";
+
+export type SheetData = {
+  os: {
+    number: number;
+    kind: string;
+    status: string;
+    os_date: string;
+    attendance_type: string;
+    delivery_date: string | null;
+    equipment: string | null;
+    problem: string | null;
+    technical_report: string | null;
+    notes: string | null;
+    internal_notes?: string | null;
+    receipt_notes: string | null;
+    warranty: string | null;
+    services_cents: number;
+    products_cents: number;
+    expenses_cents: number;
+    discount_cents: number;
+    total_cents: number;
+  };
+  org: { name: string; cnpj: string | null };
+  customer: { name: string; cpf_cnpj: string | null; email: string | null; phone: string | null } | null;
+  technician: string | null;
+  items: { id: string; kind: string; description: string; quantity: number; unit_price_cents: number; total_cents: number; rejected: boolean }[];
+  installments: { id: string; number: number; due_date: string; method: string; amount_cents: number }[];
+};
+
+/**
+ * A4 sheet for an OS or quote.
+ * mode "customer": prices, payment terms, signatures. mode "production": for the workshop, no prices, internal notes shown.
+ */
+export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData; mode?: "customer" | "production" }) {
+  const { os, org, customer: c, items, installments } = data;
+  const production = mode === "production";
+  const title = production ? "ORDEM DE PRODUÇÃO" : os.kind === "quote" ? "ORÇAMENTO" : "ORDEM DE SERVIÇO";
+  const services = items.filter((i) => i.kind === "service" && !i.rejected);
+  const products = items.filter((i) => i.kind === "product" && !i.rejected);
+
+  return (
+    <article className="sheet">
+      <header className="sheet-head">
+        <div>
+          <div className="company">{org.name}</div>
+          {org.cnpj ? <div className="muted">CNPJ {org.cnpj}</div> : null}
+        </div>
+        <div className="doc-id">
+          <div className="doc-title">{title}</div>
+          <div className="doc-number">Nº {os.number}</div>
+          <div className="muted">
+            Emissão {fmtDate(os.os_date)} · {osStatusLabel(os.status)}
+          </div>
+        </div>
+      </header>
+
+      <section className="box">
+        <h3>Cliente</h3>
+        <div className="grid">
+          <div>
+            <span>Nome</span>
+            <strong>{c?.name}</strong>
+          </div>
+          <div>
+            <span>CPF/CNPJ</span>
+            {fmtDoc(c?.cpf_cnpj)}
+          </div>
+          <div>
+            <span>Telefone</span>
+            {c?.phone ?? "—"}
+          </div>
+          <div>
+            <span>E-mail</span>
+            {c?.email ?? "—"}
+          </div>
+        </div>
+      </section>
+
+      <section className="box">
+        <h3>Atendimento</h3>
+        <div className="grid">
+          <div>
+            <span>Tipo</span>
+            {ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}
+          </div>
+          <div>
+            <span>Previsão de entrega</span>
+            {fmtDate(os.delivery_date)}
+          </div>
+          {data.technician ? (
+            <div>
+              <span>Técnico</span>
+              {data.technician}
+            </div>
+          ) : null}
+          <div className="wide">
+            <span>Equipamento</span>
+            {os.equipment ?? "—"}
+          </div>
+          <div className="wide">
+            <span>Problema relatado</span>
+            {os.problem ?? "—"}
+          </div>
+          {os.receipt_notes ? (
+            <div className="wide">
+              <span>Observações do recebimento</span>
+              {os.receipt_notes}
+            </div>
+          ) : null}
+          {os.technical_report ? (
+            <div className="wide">
+              <span>Laudo técnico</span>
+              <span style={{ whiteSpace: "pre-wrap", color: "inherit", fontSize: "inherit" }}>{os.technical_report}</span>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {(
+        [
+          ["Serviços", services],
+          ["Produtos", products],
+        ] as const
+      ).map(([label, rows]) =>
+        rows.length ? (
+          <section key={label}>
+            <h3>{label}</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th className="num">Qtd</th>
+                  {production ? <th>Feito</th> : null}
+                  {!production ? <th className="num">Unitário</th> : null}
+                  {!production ? <th className="num">Total</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((it) => (
+                  <tr key={it.id}>
+                    <td>{it.description}</td>
+                    <td className="num">{Number(it.quantity).toLocaleString("pt-BR")}</td>
+                    {production ? <td style={{ width: 60 }}>☐</td> : null}
+                    {!production ? <td className="num">{formatBRL(it.unit_price_cents)}</td> : null}
+                    {!production ? <td className="num">{formatBRL(it.total_cents)}</td> : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ) : null,
+      )}
+
+      {!production ? (
+        <section className="totals">
+          <div>
+            <span>Serviços</span>
+            {formatBRL(os.services_cents)}
+          </div>
+          <div>
+            <span>Produtos</span>
+            {formatBRL(os.products_cents)}
+          </div>
+          {os.expenses_cents > 0 ? (
+            <div>
+              <span>Despesas</span>
+              {formatBRL(os.expenses_cents)}
+            </div>
+          ) : null}
+          {os.discount_cents > 0 ? (
+            <div>
+              <span>Desconto</span>− {formatBRL(os.discount_cents)}
+            </div>
+          ) : null}
+          <div className="grand">
+            <span>Total</span>
+            {formatBRL(os.total_cents)}
+          </div>
+        </section>
+      ) : null}
+
+      {!production && installments.length ? (
+        <section>
+          <h3>Condições de pagamento</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Parcela</th>
+                <th>Vencimento</th>
+                <th>Forma</th>
+                <th className="num">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {installments.map((i) => (
+                <tr key={i.id}>
+                  <td>
+                    {i.number}/{installments.length}
+                  </td>
+                  <td>{fmtDate(i.due_date)}</td>
+                  <td>{METHOD_LABEL[i.method] ?? i.method}</td>
+                  <td className="num">{formatBRL(i.amount_cents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      {os.notes ? (
+        <section className="box">
+          <h3>Observações</h3>
+          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{os.notes}</p>
+        </section>
+      ) : null}
+
+      {production && os.internal_notes ? (
+        <section className="box">
+          <h3>Observações internas</h3>
+          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{os.internal_notes}</p>
+        </section>
+      ) : null}
+
+      {!production && os.warranty ? (
+        <section className="box">
+          <h3>Garantia</h3>
+          <p style={{ margin: 0 }}>{os.warranty}</p>
+        </section>
+      ) : null}
+
+      <footer className="signatures">
+        <div>
+          <div className="line" />
+          {production ? "Técnico responsável" : org.name}
+        </div>
+        <div>
+          <div className="line" />
+          {production ? "Conferido por" : c?.name}
+        </div>
+      </footer>
+    </article>
+  );
+}

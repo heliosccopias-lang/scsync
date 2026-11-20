@@ -1,10 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, type FormEvent } from "react";
 import { createOrder, type FormState } from "./actions";
 import { LINES } from "./constants";
 
-export function NewOrderForm({ customers, today }: { customers: { id: string; name: string }[]; today: string }) {
+export type CatalogEntry = { id: string; kind: string; name: string; price_cents: number };
+
+export function NewOrderForm({
+  customers,
+  technicians,
+  catalog,
+  today,
+}: {
+  customers: { id: string; name: string }[];
+  technicians: { id: string; name: string }[];
+  catalog: CatalogEntry[];
+  today: string;
+}) {
   const [state, action, pending] = useActionState<FormState, FormData>(createOrder, {});
   const v = state.values ?? {};
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
@@ -12,7 +24,8 @@ export function NewOrderForm({ customers, today }: { customers: { id: string; na
   const formKey = JSON.stringify(v);
 
   return (
-    <form action={action} key={formKey} noValidate>
+    <form action={action} key={formKey} noValidate onInput={(e) => fillFromCatalog(e, catalog)}>
+      <CatalogList catalog={catalog} />
       {state.error ? (
         <div className="notice notice-error" role="alert">
           {state.error}
@@ -36,6 +49,23 @@ export function NewOrderForm({ customers, today }: { customers: { id: string; na
               <option value="internal">Interno</option>
               <option value="warranty">Garantia</option>
             </select>
+          </div>
+        </div>
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="technician_id">Técnico responsável</label>
+            <select id="technician_id" name="technician_id" defaultValue={v.technician_id ?? ""}>
+              <option value="">— Nenhum —</option>
+              {technicians.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="delivery_date">Previsão de entrega</label>
+            <input id="delivery_date" name="delivery_date" type="date" defaultValue={v.delivery_date} />
           </div>
         </div>
         <div className="field">
@@ -78,8 +108,22 @@ export function NewOrderForm({ customers, today }: { customers: { id: string; na
           </div>
         </div>
         <div className="field">
-          <label htmlFor="notes">Observações</label>
-          <textarea id="notes" name="notes" defaultValue={v.notes} />
+          <label htmlFor="receipt_notes">Observações do recebimento (estado em que o equipamento chegou, acessórios)</label>
+          <input id="receipt_notes" name="receipt_notes" defaultValue={v.receipt_notes} />
+        </div>
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="notes">Observações (saem na OS do cliente)</label>
+            <textarea id="notes" name="notes" defaultValue={v.notes} />
+          </div>
+          <div className="field">
+            <label htmlFor="internal_notes">Observações internas (só a equipe vê)</label>
+            <textarea id="internal_notes" name="internal_notes" defaultValue={v.internal_notes} />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="warranty">Garantia</label>
+          <input id="warranty" name="warranty" placeholder="Ex.: 90 dias para o serviço executado" defaultValue={v.warranty} />
         </div>
       </div>
 
@@ -97,7 +141,7 @@ export function NewOrderForm({ customers, today }: { customers: { id: string; na
               <option value="service">Serviço</option>
               <option value="product">Produto</option>
             </select>
-            <input name={`item_desc_${i}`} placeholder={i === 0 ? "Ex.: Troca de tela" : ""} aria-label={`Descrição do item ${i + 1}`} defaultValue={v[`item_desc_${i}`]} style={{ flex: 3 }} {...bad(`item_desc_${i}`)} />
+            <input name={`item_desc_${i}`} list="catalog-items" autoComplete="off" placeholder={i === 0 ? "Digite ou escolha do catálogo" : ""} aria-label={`Descrição do item ${i + 1}`} defaultValue={v[`item_desc_${i}`]} style={{ flex: 3 }} {...bad(`item_desc_${i}`)} />
             <input name={`item_qty_${i}`} inputMode="decimal" aria-label={`Quantidade do item ${i + 1}`} defaultValue={v[`item_qty_${i}`] ?? "1"} style={{ width: 70 }} {...bad(`item_qty_${i}`)} />
             <input name={`item_price_${i}`} inputMode="decimal" placeholder="150,00" aria-label={`Valor unitário do item ${i + 1}`} defaultValue={v[`item_price_${i}`]} style={{ width: 150 }} {...bad(`item_price_${i}`)} />
           </div>
@@ -139,4 +183,31 @@ export function NewOrderForm({ customers, today }: { customers: { id: string; na
       </button>
     </form>
   );
+}
+
+/** Suggestions for the description fields, from the service/product catalog. */
+export function CatalogList({ catalog }: { catalog: CatalogEntry[] }) {
+  return (
+    <datalist id="catalog-items">
+      {catalog.map((c) => (
+        <option key={c.id} value={c.name}>
+          {c.kind === "service" ? "Serviço" : "Produto"} · {(c.price_cents / 100).toFixed(2).replace(".", ",")}
+        </option>
+      ))}
+    </datalist>
+  );
+}
+
+/** When a description matches a catalog name, fill kind and unit price (price only if still empty). */
+export function fillFromCatalog(e: FormEvent<HTMLFormElement>, catalog: CatalogEntry[]) {
+  const t = e.target as HTMLInputElement;
+  const m = /^item_desc_(\d+)$/.exec(t.name ?? "");
+  if (!m) return;
+  const hit = catalog.find((c) => c.name.toLowerCase() === t.value.trim().toLowerCase());
+  if (!hit) return;
+  const form = e.currentTarget;
+  const price = form.elements.namedItem(`item_price_${m[1]}`) as HTMLInputElement | null;
+  const kind = form.elements.namedItem(`item_kind_${m[1]}`) as HTMLSelectElement | null;
+  if (price && !price.value) price.value = (hit.price_cents / 100).toFixed(2).replace(".", ",");
+  if (kind) kind.value = hit.kind;
 }
