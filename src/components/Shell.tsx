@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
+import { MenuCloser } from "./MenuCloser";
 
 export function Shell({ orgName, children }: { orgName: string; children: React.ReactNode }) {
   return (
     <>
+      <MenuCloser />
       <header className="topbar">
         <div className="brand">
           SC<span>sync</span>
