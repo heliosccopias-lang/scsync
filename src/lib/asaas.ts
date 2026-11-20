@@ -100,6 +100,11 @@ export class AsaasClient {
     return this.request<AsaasPayment>("POST", "/payments", input);
   }
 
+  /** Allowed while the charge is pending or overdue. Generates PAYMENT_UPDATED. */
+  updatePayment(id: string, input: { billingType: BillingType; value: number; dueDate: string; description?: string }) {
+    return this.request<AsaasPayment>("PUT", `/payments/${encodeURIComponent(id)}`, input);
+  }
+
   getPayment(id: string) {
     return this.request<AsaasPayment>("GET", `/payments/${encodeURIComponent(id)}`);
   }

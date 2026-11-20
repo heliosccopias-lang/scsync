@@ -130,3 +130,73 @@ export async function syncChargeFromAsaas(orgId: string, asaas: AsaasClient, asa
   if (error) throw new Error(error.message);
   return data as string;
 }
+
+export type ChargeSyncResult = "none" | "updated" | "recreated" | "cancelled_below_min" | "failed";
+
+/**
+ * After an OS edit changed a título's amount, bring its open Asaas charge to the new value
+ * (same charge, same link). If Asaas refuses the update, replace the charge with a new one.
+ */
+export async function syncChargeAmount(sb: UserClient, orgId: string, receivableId: string, amountCents: number, dueDate: string): Promise<ChargeSyncResult> {
+  const { data: live } = await sb
+    .from("charges")
+    .select("id, asaas_payment_id, billing_type")
+    .eq("receivable_id", receivableId)
+    .eq("org_id", orgId)
+    .in("status", ["pending", "overdue"])
+    .maybeSingle();
+  if (!live) return "none";
+  const asaas = await asaasFor(orgId);
+  if (!asaas) return "failed";
+
+  const markCancelled = () =>
+    sb.from("charges").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", live.id);
+
+  if (amountCents < ASAAS_MIN_CHARGE_CENTS) {
+    try {
+      await asaas.deletePayment(live.asaas_payment_id);
+      await markCancelled();
+      return "cancelled_below_min";
+    } catch {
+      return "failed";
+    }
+  }
+
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const due = dueDate < today ? today : dueDate;
+  try {
+    const p = await asaas.updatePayment(live.asaas_payment_id, {
+      billingType: live.billing_type as AsaasPayment["billingType"],
+      value: centsToReais(amountCents),
+      dueDate: due,
+    });
+    let pixPayload: string | null = null;
+    try {
+      pixPayload = (await asaas.pixQrCode(live.asaas_payment_id)).payload;
+    } catch {
+      // no Pix key: link still works
+    }
+    await sb
+      .from("charges")
+      .update({
+        value_cents: amountCents,
+        due_date: due,
+        invoice_url: p.invoiceUrl ?? undefined,
+        bank_slip_url: p.bankSlipUrl ?? null,
+        pix_payload: pixPayload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", live.id);
+    return "updated";
+  } catch {
+    // Asaas would not change it: swap for a fresh charge
+    try {
+      await asaas.deletePayment(live.asaas_payment_id);
+      await markCancelled();
+      await createChargeForReceivable(sb, orgId, receivableId);
+      return "recreated";
+    } catch {
+      return "failed";
+    }
+  }
+}
