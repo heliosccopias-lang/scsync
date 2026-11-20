@@ -83,7 +83,6 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
       delivery_date: /^\d{4}-\d{2}-\d{2}$/.test(s("delivery_date")) ? s("delivery_date") : null,
       notes: s("notes") || null,
       internal_notes: s("internal_notes") || null,
-      warranty: s("warranty") || null,
       discount_cents: discount,
       items,
       installments,

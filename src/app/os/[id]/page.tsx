@@ -246,12 +246,6 @@ export default async function ServiceOrderPage({
                 <dd style={{ whiteSpace: "pre-wrap" }}>{os.technical_report}</dd>
               </>
             ) : null}
-            {os.warranty ? (
-              <>
-                <dt>Garantia</dt>
-                <dd>{os.warranty}</dd>
-              </>
-            ) : null}
             {os.internal_notes ? (
               <>
                 <dt>Obs. internas</dt>
@@ -312,10 +306,6 @@ export default async function ServiceOrderPage({
                   <label htmlFor="d_internal">Observações internas</label>
                   <textarea id="d_internal" name="internal_notes" defaultValue={os.internal_notes ?? ""} />
                 </div>
-              </div>
-              <div className="field">
-                <label htmlFor="d_warranty">Garantia</label>
-                <input id="d_warranty" name="warranty" defaultValue={os.warranty ?? ""} />
               </div>
               <button className="btn btn-secondary">Salvar dados</button>
             </form>

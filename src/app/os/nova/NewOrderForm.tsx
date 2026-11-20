@@ -124,10 +124,6 @@ export function NewOrderForm({
             <textarea id="internal_notes" name="internal_notes" defaultValue={v.internal_notes} />
           </div>
         </div>
-        <div className="field">
-          <label htmlFor="warranty">Garantia</label>
-          <input id="warranty" name="warranty" placeholder="Ex.: 90 dias para o serviço executado" defaultValue={v.warranty} />
-        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

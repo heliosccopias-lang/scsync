@@ -210,13 +210,6 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
         </section>
       ) : null}
 
-      {!production && os.warranty ? (
-        <section className="box">
-          <h3>Garantia</h3>
-          <p style={{ margin: 0 }}>{os.warranty}</p>
-        </section>
-      ) : null}
-
       <footer className="signatures">
         <div>
           <div className="line" />

@@ -192,7 +192,6 @@ export async function updateDetails(form: FormData) {
       technical_report: s("technical_report"),
       notes: s("notes"),
       internal_notes: s("internal_notes"),
-      warranty: s("warranty"),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
