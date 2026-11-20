@@ -186,6 +186,8 @@ export async function updateDetails(form: FormData) {
     .from("service_orders")
     .update({
       technician_id: s("technician_id"),
+      second_technician_id: s("second_technician_id"),
+      km_at_open: s("km_at_open") && /^\d+$/.test(String(s("km_at_open")).replace(/\D/g, "")) ? Number(String(s("km_at_open")).replace(/\D/g, "")) : null,
       delivery_date: delivery && /^\d{4}-\d{2}-\d{2}$/.test(delivery) ? delivery : null,
       attendance_type: attendance && ["internal", "external", "warranty"].includes(attendance) ? attendance : "external",
       equipment: s("equipment"),
@@ -236,4 +238,21 @@ export async function removeAttachment(form: FormData) {
   const ok = await deleteAttachment(sb, orgId, String(form.get("attachment_id")));
   if (!ok) back(id, "error", "Não foi possível remover o anexo.");
   back(id, "ok", "Anexo removido.");
+}
+
+export async function stockAction(form: FormData) {
+  const id = String(form.get("id"));
+  const op = form.get("op") === "reverse" ? "reverse_stock" : "launch_stock";
+  const { sb } = await requireOrg();
+  const { data, error } = await sb.rpc(op, { p_service_order: id });
+  if (error) {
+    const msg: Record<string, string> = {
+      stock_already_launched: "O estoque desta OS já foi baixado.",
+      no_stock_items: "Nenhum produto desta OS tem controle de estoque ligado (Cadastros → Serviços e produtos).",
+      is_quote: "Orçamento não baixa estoque: converta em OS antes.",
+      stock_not_launched: "O estoque desta OS não foi baixado.",
+    };
+    back(id, "error", msg[error.message] ?? "Não foi possível atualizar o estoque.");
+  }
+  back(id, "ok", op === "launch_stock" ? `Estoque baixado (${data} produto(s)).` : "Estoque devolvido.");
 }

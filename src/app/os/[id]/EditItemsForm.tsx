@@ -12,7 +12,21 @@ function money(cents: number) {
   return (cents / 100).toFixed(2).replace(".", ",");
 }
 
-export function EditItemsForm({ osId, items, discountCents, catalog }: { osId: string; items: Item[]; discountCents: number; catalog: CatalogEntry[] }) {
+export function EditItemsForm({
+  osId,
+  items,
+  discountCents,
+  catalog,
+  adjustments,
+  attendance,
+}: {
+  osId: string;
+  items: Item[];
+  discountCents: number;
+  catalog: CatalogEntry[];
+  adjustments: Record<string, number>;
+  attendance: string;
+}) {
   const [state, action, pending] = useActionState<EditItemsState, FormData>(updateItems, {});
   const rows = items.length + EXTRA_ROWS;
   const sent = state.values;
@@ -20,7 +34,7 @@ export function EditItemsForm({ osId, items, discountCents, catalog }: { osId: s
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
 
   return (
-    <form action={action} key={JSON.stringify(sent ?? {})} className="card" style={{ marginTop: 10 }} onInput={(e) => fillFromCatalog(e, catalog)}>
+    <form action={action} key={JSON.stringify(sent ?? {})} className="card" style={{ marginTop: 10 }} onInput={(e) => fillFromCatalog(e, catalog, adjustments, attendance)}>
       <CatalogList catalog={catalog} />
       <input type="hidden" name="id" value={osId} />
       <input type="hidden" name="rows" value={rows} />

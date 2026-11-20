@@ -11,12 +11,14 @@ export function NewOrderForm({
   technicians,
   catalog,
   conditions,
+  adjustments,
   today,
 }: {
   customers: { id: string; name: string }[];
   technicians: { id: string; name: string }[];
   catalog: CatalogEntry[];
   conditions: { id: string; name: string }[];
+  adjustments: Record<string, number>;
   today: string;
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createOrder, {});
@@ -26,7 +28,7 @@ export function NewOrderForm({
   const formKey = JSON.stringify(v);
 
   return (
-    <form action={action} key={formKey} noValidate onInput={(e) => fillFromCatalog(e, catalog)}>
+    <form action={action} key={formKey} noValidate onInput={(e) => fillFromCatalog(e, catalog, adjustments)}>
       <CatalogList catalog={catalog} />
       {state.error ? (
         <div className="notice notice-error" role="alert">
@@ -68,6 +70,32 @@ export function NewOrderForm({
           <div className="field">
             <label htmlFor="delivery_date">Previsão de entrega</label>
             <input id="delivery_date" name="delivery_date" type="date" defaultValue={v.delivery_date} />
+          </div>
+          {technicians.length > 1 ? (
+            <div className="field">
+              <label htmlFor="second_technician_id">Segundo técnico (divide a comissão)</label>
+              <select id="second_technician_id" name="second_technician_id" defaultValue={v.second_technician_id ?? ""}>
+                <option value="">— Nenhum —</option>
+                {technicians.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </div>
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="plate">Placa do veículo (oficinas, opcional)</label>
+            <input id="plate" name="plate" placeholder="ABC1D23" defaultValue={v.plate} {...bad("plate")} />
+          </div>
+          <div className="field">
+            <label htmlFor="vehicle_model">Modelo / KM de entrada</label>
+            <div className="row" style={{ flexWrap: "nowrap" }}>
+              <input id="vehicle_model" name="vehicle_model" placeholder="Modelo (se a placa for nova)" defaultValue={v.vehicle_model} />
+              <input name="km" inputMode="numeric" placeholder="KM" aria-label="KM de entrada" defaultValue={v.km} style={{ width: 110 }} />
+            </div>
           </div>
         </div>
         <div className="field">
@@ -214,7 +242,7 @@ export function CatalogList({ catalog }: { catalog: CatalogEntry[] }) {
 }
 
 /** When a description matches a catalog name, fill kind and unit price (price only if still empty). */
-export function fillFromCatalog(e: FormEvent<HTMLFormElement>, catalog: CatalogEntry[]) {
+export function fillFromCatalog(e: FormEvent<HTMLFormElement>, catalog: CatalogEntry[], adjustments: Record<string, number> = {}, attendance?: string) {
   const t = e.target as HTMLInputElement;
   const m = /^item_desc_(\d+)$/.exec(t.name ?? "");
   if (!m) return;
@@ -223,6 +251,10 @@ export function fillFromCatalog(e: FormEvent<HTMLFormElement>, catalog: CatalogE
   const form = e.currentTarget;
   const price = form.elements.namedItem(`item_price_${m[1]}`) as HTMLInputElement | null;
   const kind = form.elements.namedItem(`item_kind_${m[1]}`) as HTMLSelectElement | null;
-  if (price && !price.value) price.value = (hit.price_cents / 100).toFixed(2).replace(".", ",");
+  // price list by type of attendance (e.g. Interno -20%, Garantia +30%)
+  const att = attendance ?? (form.elements.namedItem("attendance_type") as HTMLSelectElement | null)?.value ?? "external";
+  const pct = adjustments[att] ?? 0;
+  const cents = Math.round(hit.price_cents * (1 + pct / 100));
+  if (price && !price.value) price.value = (cents / 100).toFixed(2).replace(".", ",");
   if (kind) kind.value = hit.kind;
 }

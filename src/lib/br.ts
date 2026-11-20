@@ -44,3 +44,12 @@ export function whatsappLink(phone: string | null | undefined, text: string): st
   if (!n) return null;
   return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
 }
+
+/** Brazilian plate without separators, upper case: "abc-1d23" -> "ABC1D23". */
+export function normalizePlate(p: string): string {
+  return p.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+export function isValidPlate(p: string): boolean {
+  return /^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normalizePlate(p));
+}

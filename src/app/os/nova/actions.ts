@@ -5,7 +5,7 @@ import { parseItemRows } from "@/lib/items";
 import { addDays, addMonths, parseBRL, splitInstallments, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
 import { LINES } from "./constants";
-import { isValidCnpj, isValidCpf } from "@/lib/br";
+import { isValidCnpj, isValidCpf, isValidPlate, normalizePlate } from "@/lib/br";
 
 
 export type FormState = { error?: string; field?: string; values?: Record<string, string> };
@@ -25,6 +25,10 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
     if (!s("customer_name")) return fail("Informe o nome do cliente ou escolha um cliente cadastrado.", "customer_name");
     if (doc && !(isValidCpf(doc) || isValidCnpj(doc))) return fail("CPF/CNPJ inválido. Confira os números.", "customer_doc");
   }
+
+  const plate = normalizePlate(s("plate"));
+  if (plate && !isValidPlate(plate)) return fail("Placa inválida. Use o padrão ABC1234 ou ABC1D23.", "plate");
+  const km = s("km").replace(/\D/g, "");
 
   const parsed = parseItemRows(values, LINES);
   if ("error" in parsed) return fail(parsed.error, parsed.field);
@@ -96,5 +100,25 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
     if (createdCustomer) await sb.from("customers").delete().eq("id", customerId).eq("org_id", orgId);
     return fail("Não foi possível salvar a OS. Tente de novo.");
   }
+  // Extras that the creation function does not take: vehicle (found or created by plate), KM and second technician.
+  const extra: Record<string, unknown> = {};
+  if (plate) {
+    const { data: veh } = await sb.from("vehicles").select("id").eq("org_id", orgId).eq("plate", plate).maybeSingle();
+    let vehicleId = veh?.id as string | undefined;
+    if (!vehicleId) {
+      const { data: created } = await sb
+        .from("vehicles")
+        .insert({ org_id: orgId, customer_id: customerId, plate, model: s("vehicle_model") || null, km: km ? Number(km) : null })
+        .select("id")
+        .single();
+      vehicleId = created?.id;
+    } else if (km) {
+      await sb.from("vehicles").update({ km: Number(km), updated_at: new Date().toISOString() }).eq("id", vehicleId);
+    }
+    if (vehicleId) extra.vehicle_id = vehicleId;
+  }
+  if (km) extra.km_at_open = Number(km);
+  if (s("second_technician_id")) extra.second_technician_id = s("second_technician_id");
+  if (Object.keys(extra).length) await sb.from("service_orders").update(extra).eq("id", osId).eq("org_id", orgId);
   redirect(`/os/${osId}`);
 }

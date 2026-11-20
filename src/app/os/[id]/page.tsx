@@ -12,7 +12,7 @@ import { ATTENDANCE_LABEL, fmtDate as fmtDay } from "@/lib/format";
 import { listAttachments, fmtSize } from "@/lib/attachments";
 import { Uploader } from "@/components/Uploader";
 import { registerOsFiles } from "./files-actions";
-import { addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
+import { stockAction, addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
 
 const METHOD: Record<string, string> = {
   pix: "Pix",
@@ -51,13 +51,15 @@ export default async function ServiceOrderPage({
 
   const { data: os } = await sb
     .from("service_orders")
-    .select("*, customers(id, name, cpf_cnpj, email, phone), technicians!service_orders_technician_id_fkey(name)")
+    .select(
+      "*, customers(id, name, cpf_cnpj, email, phone), technicians!service_orders_technician_id_fkey(name), second:technicians!service_orders_second_technician_id_fkey(name), vehicles(plate, model)",
+    )
     .eq("id", id)
     .eq("org_id", orgId)
     .maybeSingle();
   if (!os) notFound();
 
-  const [{ data: items }, { data: installments }, { data: receivables }, { data: pay }, { data: technicians }, { data: catalog }] = await Promise.all([
+  const [{ data: items }, { data: installments }, { data: receivables }, { data: pay }, { data: technicians }, { data: catalog }, { data: priceLists }] = await Promise.all([
     sb.from("service_order_items").select("*").eq("service_order_id", id).order("position"),
     sb.from("service_order_installments").select("*").eq("service_order_id", id).order("number"),
     sb
@@ -68,8 +70,12 @@ export default async function ServiceOrderPage({
       .order("due_date"),
     sb.from("service_order_payment_view").select("payment_status").eq("service_order_id", id).maybeSingle(),
     sb.from("technicians").select("id, name").eq("org_id", orgId).eq("active", true).order("name"),
-    sb.from("catalog_items").select("id, kind, name, price_cents").eq("org_id", orgId).eq("active", true).order("name").limit(2000),
+    sb.from("catalog_items").select("id, kind, name, price_cents, track_stock").eq("org_id", orgId).eq("active", true).order("name").limit(2000),
+    sb.from("price_lists").select("attendance_type, adjust_pct").eq("org_id", orgId).not("attendance_type", "is", null),
   ]);
+  const adjustments = Object.fromEntries((priceLists ?? []).map((p) => [p.attendance_type as string, Number(p.adjust_pct)]));
+  const stockNames = new Set((catalog ?? []).filter((c) => c.kind === "product" && c.track_stock).map((c) => c.name.toLowerCase()));
+  const hasStockItems = (items ?? []).some((it) => it.kind === "product" && !it.rejected && stockNames.has(String(it.description).toLowerCase()));
   const [{ data: runs }, { data: availableChecklists }] = await Promise.all([
     sb.from("checklist_runs").select("id, status, checklists(name)").eq("service_order_id", id).order("updated_at"),
     sb.from("checklists").select("id, name").eq("org_id", orgId).eq("active", true).order("name"),
@@ -119,6 +125,8 @@ export default async function ServiceOrderPage({
   const appUrl = process.env.APP_URL ?? "https://scsync.vercel.app";
   const publicUrl = `${appUrl}/p/${os.share_token}`;
   const technicianName = (os.technicians as unknown as { name: string } | null)?.name ?? null;
+  const secondName = (os.second as unknown as { name: string } | null)?.name ?? null;
+  const vehicle = os.vehicles as unknown as { plate: string; model: string | null } | null;
   const shareWa = whatsappLink(
     (os.customers as unknown as { phone: string | null } | null)?.phone,
     [
@@ -225,7 +233,20 @@ export default async function ServiceOrderPage({
           <div className="muted">Dados da OS</div>
           <dl className="facts">
             <dt>Técnico</dt>
-            <dd>{technicianName ?? "—"}</dd>
+            <dd>
+              {technicianName ?? "—"}
+              {secondName ? ` e ${secondName}` : ""}
+            </dd>
+            {vehicle ? (
+              <>
+                <dt>Veículo</dt>
+                <dd>
+                  {vehicle.plate}
+                  {vehicle.model ? ` · ${vehicle.model}` : ""}
+                  {os.km_at_open != null ? ` · ${Number(os.km_at_open).toLocaleString("pt-BR")} km` : ""}
+                </dd>
+              </>
+            ) : null}
             <dt>Atendimento</dt>
             <dd>{ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}</dd>
             <dt>Entrega prevista</dt>
@@ -274,6 +295,21 @@ export default async function ServiceOrderPage({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="d_tech2">Segundo técnico</label>
+                  <select id="d_tech2" name="second_technician_id" defaultValue={os.second_technician_id ?? ""}>
+                    <option value="">— Nenhum —</option>
+                    {(technicians ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="d_km">KM de entrada</label>
+                  <input id="d_km" name="km_at_open" inputMode="numeric" defaultValue={os.km_at_open ?? ""} />
                 </div>
                 <div className="field">
                   <label htmlFor="d_att">Atendimento</label>
@@ -375,6 +411,8 @@ export default async function ServiceOrderPage({
           </summary>
           <EditItemsForm
             catalog={catalog ?? []}
+            adjustments={adjustments}
+            attendance={os.attendance_type}
             osId={id}
             discountCents={os.discount_cents}
             items={(items ?? []).map((it) => ({ kind: it.kind, description: it.description, quantity: it.quantity, unit_price_cents: it.unit_price_cents }))}
@@ -382,6 +420,29 @@ export default async function ServiceOrderPage({
         </details>
       ) : null}
 
+
+      {hasStockItems && os.kind === "order" ? (
+        <div className="row" style={{ marginTop: 12 }}>
+          {os.stock_launched_at ? (
+            <>
+              <span className="muted">Estoque baixado em {fmtDay(os.stock_launched_at)}.</span>
+              <form action={stockAction}>
+                <input type="hidden" name="id" value={id} />
+                <input type="hidden" name="op" value="reverse" />
+                <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 13 }}>
+                  Estornar estoque
+                </button>
+              </form>
+            </>
+          ) : (
+            <form action={stockAction}>
+              <input type="hidden" name="id" value={id} />
+              <input type="hidden" name="op" value="launch" />
+              <button className="btn btn-secondary">Lançar estoque (baixar peças usadas)</button>
+            </form>
+          )}
+        </div>
+      ) : null}
 
       <div className="grid2" style={{ marginTop: 28 }}>
         <div className="card">

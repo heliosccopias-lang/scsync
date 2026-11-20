@@ -33,13 +33,59 @@ async function toggle(form: FormData) {
   back("ok", active ? "Item desativado: não aparece mais nas novas OS." : "Item reativado.", String(form.get("kind")));
 }
 
+async function stockEntry(form: FormData) {
+  "use server";
+  const { sb, orgId, user } = await requireOrg();
+  const qty = Number(String(form.get("qty") ?? "").replace(",", "."));
+  const reason = form.get("reason") === "adjust" ? "adjust" : "purchase";
+  if (!qty || !Number.isFinite(qty)) back("error", "Informe a quantidade (use negativo para retirar no ajuste).", "product");
+  if (reason === "purchase" && qty < 0) back("error", "Entrada de compra deve ser positiva.", "product");
+  const { error } = await sb.from("stock_movements").insert({
+    org_id: orgId,
+    catalog_item_id: String(form.get("id")),
+    quantity: qty,
+    reason,
+    notes: String(form.get("notes") ?? "").trim() || null,
+    created_by: user.id,
+  });
+  if (error) back("error", "Não foi possível lançar no estoque.", "product");
+  back("ok", "Estoque atualizado.", "product");
+}
+
+async function toggleStock(form: FormData) {
+  "use server";
+  const { sb, orgId } = await requireOrg();
+  const on = form.get("track") === "true";
+  await sb.from("catalog_items").update({ track_stock: !on }).eq("id", String(form.get("id"))).eq("org_id", orgId);
+  back("ok", on ? "Controle de estoque desligado para este produto." : "Controle de estoque ligado.", "product");
+}
+
+async function saveAdjustments(form: FormData) {
+  "use server";
+  const { sb, orgId } = await requireOrg();
+  const labels: Record<string, string> = { external: "Externo", internal: "Interno", warranty: "Garantia" };
+  for (const att of Object.keys(labels)) {
+    const pct = Number(String(form.get(att) ?? "0").replace(",", ".") || 0);
+    if (!Number.isFinite(pct) || pct < -100 || pct > 500) back("error", "Ajuste entre -100% e 500%.", String(form.get("kind")));
+    const { error } = await sb
+      .from("price_lists")
+      .upsert({ org_id: orgId, name: `Atendimento ${labels[att]}`, attendance_type: att, adjust_pct: pct, updated_at: new Date().toISOString() }, { onConflict: "org_id,attendance_type" });
+    if (error) back("error", "Não foi possível salvar os ajustes.", String(form.get("kind")));
+  }
+  back("ok", "Ajustes de preço por atendimento salvos.", String(form.get("kind")));
+}
+
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<{ tipo?: string; q?: string; error?: string; ok?: string }> }) {
   const { tipo, q, error, ok } = await searchParams;
   const kind = tipo === "product" ? "product" : "service";
   const { sb, orgId, orgName } = await requireOrg();
-  let query = sb.from("catalog_items").select("id, kind, name, unit, price_cents, active").eq("org_id", orgId).eq("kind", kind).order("active", { ascending: false }).order("name");
+  let query = sb.from("catalog_items").select("id, kind, name, unit, price_cents, active, track_stock, stock_qty").eq("org_id", orgId).eq("kind", kind).order("active", { ascending: false }).order("name");
   if (q) query = query.ilike("name", `%${q}%`);
-  const { data: items } = await query.limit(500);
+  const [{ data: items }, { data: priceLists }] = await Promise.all([
+    query.limit(500),
+    sb.from("price_lists").select("attendance_type, adjust_pct").eq("org_id", orgId).not("attendance_type", "is", null),
+  ]);
+  const adj = Object.fromEntries((priceLists ?? []).map((p) => [p.attendance_type as string, Number(p.adjust_pct)]));
 
   return (
     <Shell orgName={orgName}>
@@ -87,6 +133,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
               <th>Nome</th>
               <th>Unidade</th>
               <th className="num">Preço</th>
+              {kind === "product" ? <th className="num">Estoque</th> : null}
               <th>Situação</th>
               <th></th>
             </tr>
@@ -111,6 +158,45 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                     </form>
                   </details>
                 </td>
+                {kind === "product" ? (
+                  <td className="num" style={{ whiteSpace: "nowrap" }}>
+                    {it.track_stock ? (
+                      <details>
+                        <summary style={{ cursor: "pointer", color: Number(it.stock_qty) <= 0 ? "var(--bad)" : undefined }}>
+                          {Number(it.stock_qty).toLocaleString("pt-BR")} {it.unit}
+                        </summary>
+                        <form action={stockEntry} className="card" style={{ position: "absolute", zIndex: 5, width: 300, textAlign: "left" }}>
+                          <input type="hidden" name="id" value={it.id} />
+                          <div className="field">
+                            <label>Quantidade</label>
+                            <input name="qty" inputMode="decimal" placeholder="Ex.: 10" required />
+                          </div>
+                          <div className="field">
+                            <label>Tipo</label>
+                            <select name="reason" defaultValue="purchase">
+                              <option value="purchase">Entrada (compra)</option>
+                              <option value="adjust">Ajuste (use negativo para retirar)</option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Observação</label>
+                            <input name="notes" />
+                          </div>
+                          <button className="btn btn-primary">Lançar</button>
+                        </form>
+                      </details>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                    <form action={toggleStock}>
+                      <input type="hidden" name="id" value={it.id} />
+                      <input type="hidden" name="track" value={String(it.track_stock)} />
+                      <button className="btn btn-secondary" style={{ padding: "1px 6px", fontSize: 11 }}>
+                        {it.track_stock ? "Desligar controle" : "Controlar estoque"}
+                      </button>
+                    </form>
+                  </td>
+                ) : null}
                 <td>{it.active ? <span className="pill pill-paid">Ativo</span> : <span className="pill pill-neutral">Inativo</span>}</td>
                 <td>
                   <form action={toggle}>
@@ -127,6 +213,26 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           </tbody>
         </table>
       )}
+      <form action={saveAdjustments} className="card" style={{ marginTop: 16 }}>
+        <input type="hidden" name="kind" value={kind} />
+        <strong>Lista de preço por tipo de atendimento</strong>
+        <p className="muted" style={{ margin: "4px 0 10px" }}>
+          Ajusta o preço do catálogo ao escolher o item na OS. Ex.: Interno −20, Garantia 30 (em %). Deixe 0 para usar o preço normal.
+        </p>
+        <div className="row" style={{ flexWrap: "nowrap", alignItems: "flex-end" }}>
+          {[
+            ["external", "Externo"],
+            ["internal", "Interno"],
+            ["warranty", "Garantia"],
+          ].map(([k, label]) => (
+            <div key={k} className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor={`adj_${k}`}>{label} (%)</label>
+              <input id={`adj_${k}`} name={k} inputMode="decimal" defaultValue={String(adj[k] ?? 0).replace(".", ",")} />
+            </div>
+          ))}
+          <button className="btn btn-secondary">Salvar ajustes</button>
+        </div>
+      </form>
       <p className="muted" style={{ marginTop: 12 }}>
         Clique no nome para editar. Na OS, ao digitar o nome de um item cadastrado, o preço é preenchido sozinho.
       </p>
