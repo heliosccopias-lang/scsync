@@ -121,6 +121,19 @@ const STATUS_EVENT: Record<string, string> = {
  */
 export async function syncChargeFromAsaas(orgId: string, asaas: AsaasClient, asaasPaymentId: string) {
   const payment: AsaasPayment = await asaas.getPayment(asaasPaymentId);
+  if (["PENDING", "OVERDUE"].includes(payment.status)) {
+    // pick up a Pix code that was missing (e.g. Pix key registered after the charge was created)
+    try {
+      const q = await asaas.pixQrCode(asaasPaymentId);
+      await supabaseAdmin()
+        .from("charges")
+        .update({ pix_payload: q.payload, invoice_url: payment.invoiceUrl ?? undefined, updated_at: new Date().toISOString() })
+        .eq("org_id", orgId)
+        .eq("asaas_payment_id", asaasPaymentId);
+    } catch {
+      // still no Pix key
+    }
+  }
   const event = STATUS_EVENT[payment.status];
   if (!event) return "ignored";
   const { data, error } = await supabaseAdmin().rpc("apply_asaas_event", {

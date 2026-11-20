@@ -6,6 +6,8 @@ import { ASAAS_MIN_CHARGE_CENTS } from "@/lib/constants";
 import { formatBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
 import { EditItemsForm } from "./EditItemsForm";
+import { CopyButton } from "@/components/CopyButton";
+import { asaasFor } from "@/lib/charges";
 import { charge, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
 
 const METHOD: Record<string, string> = {
@@ -79,6 +81,25 @@ export default async function ServiceOrderPage({
     : [{ data: [] }, { data: [] }];
   const chargeBy = new Map<string, NonNullable<typeof charges>[number]>();
   for (const c of charges ?? []) if (!chargeBy.has(c.receivable_id)) chargeBy.set(c.receivable_id, c);
+
+  // QR Code images for open charges, straight from Asaas (not stored).
+  const qrBy = new Map<string, string>();
+  const openCharges = [...chargeBy.values()].filter((c) => ["pending", "overdue"].includes(c.status) && c.billing_type !== "CREDIT_CARD");
+  if (openCharges.length) {
+    const asaas = await asaasFor(orgId);
+    if (asaas) {
+      await Promise.all(
+        openCharges.map(async (c) => {
+          try {
+            const q = await asaas.pixQrCode(c.asaas_payment_id);
+            if (q.encodedImage) qrBy.set(c.asaas_payment_id, q.encodedImage);
+          } catch {
+            // no Pix key on the Asaas account: the page explains it below
+          }
+        }),
+      );
+    }
+  }
 
   const customer = os.customers as unknown as { id: string; name: string; cpf_cnpj: string | null; email: string | null; phone: string | null };
   const launched = Boolean(os.accounts_launched_at);
@@ -317,10 +338,31 @@ export default async function ServiceOrderPage({
                     ) : null}
                   </div>
                   {c.pix_payload ? (
-                    <details style={{ marginTop: 8 }}>
-                      <summary>Pix copia e cola</summary>
-                      <code className="copy">{c.pix_payload}</code>
-                    </details>
+                    <div className="row" style={{ marginTop: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+                      {qrBy.get(c.asaas_payment_id) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`data:image/png;base64,${qrBy.get(c.asaas_payment_id)}`}
+                          alt={`QR Code Pix de ${formatBRL(r.open_cents)}`}
+                          width={180}
+                          height={180}
+                          style={{ background: "#fff", borderRadius: 8, padding: 6 }}
+                        />
+                      ) : null}
+                      <div style={{ flex: 1, minWidth: 240 }}>
+                        <strong>Pix de {formatBRL(r.open_cents)}</strong>
+                        <p className="muted" style={{ margin: "4px 0 8px" }}>
+                          O cliente pode ler o QR Code na tela ou pagar com o código copia e cola.
+                        </p>
+                        <code className="copy" style={{ marginBottom: 8 }}>{c.pix_payload}</code>
+                        <CopyButton text={c.pix_payload} />
+                      </div>
+                    </div>
+                  ) : c.billing_type !== "CREDIT_CARD" ? (
+                    <p style={{ marginTop: 10, marginBottom: 0 }}>
+                      O Asaas não gerou o código Pix: cadastre uma <strong>chave Pix</strong> na sua conta Asaas (no ambiente de teste também) e clique em
+                      &ldquo;Consultar no Asaas&rdquo;. Enquanto isso, o link de pagamento funciona.
+                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -331,7 +373,7 @@ export default async function ServiceOrderPage({
                     <form action={charge}>
                       <input type="hidden" name="id" value={id} />
                       <input type="hidden" name="receivable_id" value={r.id} />
-                      <button className="btn btn-primary">Cobrar pelo Asaas (Pix / link)</button>
+                      <button className="btn btn-primary">Gerar Pix / cobrança</button>
                     </form>
                   ) : null}
                   {!live && r.open_cents < ASAAS_MIN_CHARGE_CENTS ? (
@@ -348,7 +390,7 @@ export default async function ServiceOrderPage({
                       <input type="hidden" name="receivable_id" value={r.id} />
                       {live ? (
                         <p className="muted" style={{ marginTop: 0 }}>
-                          Ao registrar, a cobrança aberta no Asaas é cancelada para o cliente não pagar duas vezes.
+                          Ao registrar, a cobrança Pix aberta no Asaas é cancelada para o cliente não pagar duas vezes.
                         </p>
                       ) : null}
                       <div className="grid2">
