@@ -86,7 +86,9 @@ async function importCsv(form: FormData) {
     );
     failed += results.filter((r) => r.error).length;
   }
-  const done = `Importação concluída: ${inserts.length} novo(s), ${updates.length} atualizado(s).`;
+  const where = (k: string) => plan.items.filter((i) => i.kind === k).length;
+  const split = [where("service") ? `${where("service")} em Serviços` : "", where("product") ? `${where("product")} em Produtos` : ""].filter(Boolean).join(" e ");
+  const done = `Importação concluída: ${inserts.length} novo(s), ${updates.length} atualizado(s) — ${split}.`;
   const fail = failed ? ` ${failed} item(ns) não foram salvos; tente importar de novo.` : "";
   back(failed ? "error" : "ok", done + fail + problems, kind);
 }
@@ -204,7 +206,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           <p className="muted" style={{ marginTop: 0, fontSize: 14 }}>
             Colunas, em qualquer ordem: <strong>Código</strong>, <strong>Tipo</strong> (Serviço ou Produto), <strong>Nome</strong> (ou Produto/Descrição),{" "}
             <strong>Unidade</strong> e <strong>Preço</strong> (ou Valor de Venda). Só o nome é obrigatório. Sem a coluna Tipo, entra tudo como{" "}
-            {kind === "service" ? "serviço" : "produto"} (se a coluna do nome se chamar Produto, entra como produto). Item já cadastrado com o mesmo código ou
+            {kind === "service" ? "serviço" : "produto"} (a aba aberta agora). Item já cadastrado com o mesmo código ou
             nome é atualizado; célula vazia mantém o que já está. No Excel, salve como <em>CSV (separado por vírgulas)</em>; no Google Planilhas, <em>Arquivo → Fazer download → CSV</em>.{" "}
             <a href="/cadastros/itens/modelo">Baixar planilha modelo</a>
           </p>

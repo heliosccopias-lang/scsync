@@ -112,11 +112,6 @@ export function planCatalogImport(rows: string[][], defaultKind: Kind): ImportPl
   const cCode = col("code");
   const cUnit = col("unit");
   const cPrice = priceColumn(header);
-  // Without a Tipo column, a name column called "Produto" or "Serviço" says the kind.
-  if (cKind < 0 && cName >= 0) {
-    if (header[cName].startsWith("produto")) defaultKind = "product";
-    else if (header[cName].startsWith("servico")) defaultKind = "service";
-  }
   if (cName < 0) return { items: [], errors: ['Não achei a coluna "Nome" no cabeçalho. Use o modelo: Código; Tipo; Nome; Unidade; Preço.'], total: 0 };
   if (rows.length - 1 > IMPORT_MAX_ROWS) return { items: [], errors: [`A planilha tem ${rows.length - 1} linhas; o máximo por importação é ${IMPORT_MAX_ROWS}.`], total: 0 };
 

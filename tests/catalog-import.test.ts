@@ -18,10 +18,10 @@ describe("catalog CSV import", () => {
       { kind: "service", code: null, name: "Adesivo", unit: "m2", price_cents: null },
     ]);
   });
-  it('reads "Codigo / Produto / Valor de Venda" (tab or semicolon) as products with code and price', () => {
+  it('reads "Codigo / Produto / Valor de Venda" (tab or semicolon); without a Tipo column the open tab decides', () => {
     for (const sep of ["\t", ";"]) {
       const text = ["Codigo", "Produto", "Valor de Venda"].join(sep) + "\n" + ["001", "Banner lona 1x1", "R$ 45,90"].join(sep) + "\n" + ["002", "Adesivo m2", "38,505"].join(sep) + "\n";
-      expect(planCatalogImport(parseCsv(text), "service").items).toEqual([
+      expect(planCatalogImport(parseCsv(text), "product").items).toEqual([
         { kind: "product", code: "001", name: "Banner lona 1x1", unit: null, price_cents: 4590 },
         { kind: "product", code: "002", name: "Adesivo m2", unit: null, price_cents: 3851 },
       ]);
