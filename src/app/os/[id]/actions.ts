@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { AsaasError } from "@/lib/asaas";
+import { deleteAttachment } from "@/lib/attachments";
 import { onlyDigits, isValidCpfCnpj } from "@/lib/br";
 import { asaasFor, createChargeForReceivable, syncChargeFromAsaas } from "@/lib/charges";
 import { parseBRL, todayInSaoPaulo } from "@/lib/money";
@@ -211,4 +212,26 @@ export async function convertQuote(form: FormData) {
     .eq("kind", "quote");
   if (error || !count) back(id, "error", "Não foi possível converter o orçamento.");
   back(id, "ok", "Orçamento aprovado e convertido em ordem de serviço. Agora você pode lançar as contas.");
+}
+
+export async function addChecklist(form: FormData) {
+  const id = String(form.get("id"));
+  const { sb, orgId } = await requireOrg();
+  const checklistId = String(form.get("checklist_id") ?? "");
+  if (!checklistId) back(id, "error", "Escolha um checklist.");
+  const { data, error } = await sb
+    .from("checklist_runs")
+    .insert({ org_id: orgId, checklist_id: checklistId, service_order_id: id })
+    .select("id")
+    .single();
+  if (error || !data) back(id, "error", error?.code === "23505" ? "Este checklist já está nesta OS." : "Não foi possível incluir o checklist.");
+  redirect(`/os/${id}/checklist/${data.id}`);
+}
+
+export async function removeAttachment(form: FormData) {
+  const id = String(form.get("id"));
+  const { sb, orgId } = await requireOrg();
+  const ok = await deleteAttachment(sb, orgId, String(form.get("attachment_id")));
+  if (!ok) back(id, "error", "Não foi possível remover o anexo.");
+  back(id, "ok", "Anexo removido.");
 }

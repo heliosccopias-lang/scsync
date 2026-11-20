@@ -64,7 +64,7 @@ export async function importOfx(form: FormData) {
   const { sb, orgId, user, acc } = await accountOf(conta);
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) back(conta, "error", "Escolha o arquivo OFX exportado do site do banco.");
-  if (file.size > 5 * 1024 * 1024) back(conta, "error", "Arquivo grande demais (máximo 5 MB). Exporte um período menor.");
+  if (file.size > 4 * 1024 * 1024) back(conta, "error", "Arquivo grande demais (máximo 4 MB). Exporte um período menor.");
   const invert = form.get("invert") === "on";
 
   const st = parseOfx(decodeOfx(new Uint8Array(await file.arrayBuffer())));

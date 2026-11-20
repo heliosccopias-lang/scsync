@@ -9,7 +9,10 @@ import { EditItemsForm } from "./EditItemsForm";
 import { CopyButton } from "@/components/CopyButton";
 import { asaasFor } from "@/lib/charges";
 import { ATTENDANCE_LABEL, fmtDate as fmtDay } from "@/lib/format";
-import { charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
+import { listAttachments, fmtSize } from "@/lib/attachments";
+import { Uploader } from "@/components/Uploader";
+import { registerOsFiles } from "./files-actions";
+import { addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
 
 const METHOD: Record<string, string> = {
   pix: "Pix",
@@ -67,6 +70,11 @@ export default async function ServiceOrderPage({
     sb.from("technicians").select("id, name").eq("org_id", orgId).eq("active", true).order("name"),
     sb.from("catalog_items").select("id, kind, name, price_cents").eq("org_id", orgId).eq("active", true).order("name").limit(2000),
   ]);
+  const [{ data: runs }, { data: availableChecklists }] = await Promise.all([
+    sb.from("checklist_runs").select("id, status, checklists(name)").eq("service_order_id", id).order("updated_at"),
+    sb.from("checklists").select("id, name").eq("org_id", orgId).eq("active", true).order("name"),
+  ]);
+  const files = await listAttachments(sb, orgId, "service_order", [id]);
   const recIds = (receivables ?? []).map((r) => r.id);
   const [{ data: charges }, { data: settlements }] = recIds.length
     ? await Promise.all([
@@ -374,6 +382,79 @@ export default async function ServiceOrderPage({
         </details>
       ) : null}
 
+
+      <div className="grid2" style={{ marginTop: 28 }}>
+        <div className="card">
+          <div className="spread" style={{ marginBottom: 8 }}>
+            <strong>Checklists</strong>
+            <Link href="/cadastros/checklists" className="muted" style={{ fontSize: 13 }}>
+              Gerenciar
+            </Link>
+          </div>
+          {(runs ?? []).length === 0 ? <p className="muted" style={{ margin: "0 0 8px" }}>Nenhum checklist nesta OS.</p> : null}
+          {(runs ?? []).map((r) => {
+            const [label, cls] =
+              r.status === "done" ? ["Finalizado", "pill-paid"] : r.status === "in_progress" ? ["Com pendências", "pill-partial"] : ["Não iniciado", "pill-neutral"];
+            return (
+              <div key={r.id} className="spread" style={{ marginBottom: 6 }}>
+                <Link href={`/os/${id}/checklist/${r.id}`}>{(r.checklists as unknown as { name: string } | null)?.name}</Link>
+                <span className={`pill ${cls}`}>{label}</span>
+              </div>
+            );
+          })}
+          {(availableChecklists ?? []).length ? (
+            <form action={addChecklist} className="row" style={{ marginTop: 8, flexWrap: "nowrap" }}>
+              <input type="hidden" name="id" value={id} />
+              <select name="checklist_id" aria-label="Checklist" defaultValue="">
+                <option value="" disabled>
+                  Incluir checklist…
+                </option>
+                {(availableChecklists ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn-secondary">Incluir</button>
+            </form>
+          ) : (
+            <p className="muted" style={{ fontSize: 13 }}>
+              Crie modelos em Cadastros → Checklists.
+            </p>
+          )}
+        </div>
+        <div className="card">
+          <strong>Anexos</strong>
+          <p className="muted" style={{ margin: "4px 0 8px", fontSize: 13 }}>
+            Fotos do equipamento, contrato, notas. Até 10 por vez, 5 MB cada.
+          </p>
+          <div className="row" style={{ marginBottom: 8 }}>
+            {files.map((f) => (
+              <div key={f.id} style={{ textAlign: "center", width: 104 }}>
+                <a href={f.url ?? "#"} target="_blank" rel="noreferrer" title={f.file_name}>
+                  {f.isImage && f.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={f.url} alt={f.file_name} width={96} height={96} style={{ objectFit: "cover", borderRadius: 6 }} />
+                  ) : (
+                    <div className="card" style={{ width: 96, height: 96, padding: 6, fontSize: 11, overflow: "hidden" }}>
+                      {f.file_name}
+                    </div>
+                  )}
+                </a>
+                <div className="muted" style={{ fontSize: 11 }}>{fmtSize(f.size_bytes)}</div>
+                <form action={removeAttachment}>
+                  <input type="hidden" name="id" value={id} />
+                  <input type="hidden" name="attachment_id" value={f.id} />
+                  <button className="btn btn-secondary" style={{ padding: "1px 6px", fontSize: 11 }}>
+                    Remover
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+          <Uploader orgId={orgId} folder={`service_order/${id}`} register={registerOsFiles} extra={{ os_id: id }} />
+        </div>
+      </div>
       <div className="spread" style={{ marginTop: 28 }}>
         <h2 style={{ margin: 0 }}>Pagamento</h2>
         {!launched && os.kind !== "quote" && (installments ?? []).length > 0 ? (
