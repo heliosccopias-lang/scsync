@@ -8,7 +8,11 @@ import { supabaseAdmin } from "@/lib/supabase";
 async function connect(form: FormData) {
   "use server";
   const { orgId, role, user } = await requireOrg();
-  const back = (msg: string) => redirect(`/configuracoes/asaas?error=${encodeURIComponent(msg)}`);
+  const back = (msg: string, detail?: unknown): never => {
+    // Logged without the key, so the reason shows up in Vercel's runtime logs.
+    console.warn("[asaas-connect] failed", { orgId, msg, detail });
+    redirect(`/configuracoes/asaas?error=${encodeURIComponent(msg)}`);
+  };
   if (!["owner", "admin"].includes(role)) back("Só o administrador da empresa pode conectar o Asaas.");
 
   const env = (form.get("environment") === "production" ? "production" : "sandbox") as AsaasEnvironment;
@@ -23,7 +27,14 @@ async function connect(form: FormData) {
   try {
     await client.balance();
   } catch (e) {
-    back(e instanceof AsaasError && e.status === 401 ? "Chave inválida para o ambiente escolhido." : "Não foi possível falar com o Asaas.");
+    const status = e instanceof AsaasError ? e.status : null;
+    const why = e instanceof Error ? e.message : String(e);
+    back(
+      status === 401
+        ? "Chave inválida para o ambiente escolhido. Confira se a chave é do Sandbox e começa com $aact_."
+        : `Não foi possível falar com o Asaas${status ? ` (HTTP ${status}: ${why})` : `: ${why}`}.`,
+      { step: "balance", status, why, env, keyPrefix: apiKey.slice(0, 6), keyLength: apiKey.length },
+    );
   }
 
   const token = newWebhookToken();
@@ -37,7 +48,11 @@ async function connect(form: FormData) {
     });
     webhookId = wh.id;
   } catch (e) {
-    back(`O Asaas recusou o webhook: ${e instanceof Error ? e.message : "erro"}`);
+    back(`O Asaas recusou o webhook: ${e instanceof Error ? e.message : "erro"}`, {
+      step: "webhook",
+      status: e instanceof AsaasError ? e.status : null,
+      details: e instanceof AsaasError ? e.details : String(e),
+    });
   }
 
   const { error } = await supabaseAdmin()
@@ -50,7 +65,8 @@ async function connect(form: FormData) {
       webhook_token_hash: sha256(token),
       updated_at: new Date().toISOString(),
     });
-  if (error) back("Falha ao salvar a conexão.");
+  if (error) back("Falha ao salvar a conexão.", { step: "save", error: error.message });
+  console.info("[asaas-connect] connected", { orgId, env, webhookId });
   redirect(`/configuracoes/asaas?ok=${encodeURIComponent("Asaas conectado. As cobranças já podem ser geradas.")}`);
 }
 
