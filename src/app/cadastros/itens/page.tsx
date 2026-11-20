@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import { Notice, Shell } from "@/components/Shell";
 import { formatBRL, parseBRL } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
-import { decodeCsv, parseCsv, planCatalogImport } from "@/lib/catalog-import";
+import type { ImportItem } from "@/lib/catalog-import";
+import { catalogMatcher } from "@/lib/catalog-import-db";
+import { importCsv } from "./import-actions";
+import { ImportPreview } from "./ImportPreview";
 
 function back(key: "error" | "ok", msg: string, tipo?: string): never {
   redirect(`/cadastros/itens?${tipo ? `tipo=${tipo}&` : ""}${key}=${encodeURIComponent(msg)}`);
@@ -25,72 +28,6 @@ async function save(form: FormData) {
     : await sb.from("catalog_items").insert(row);
   if (error) back("error", error.code === "23505" ? `Já existe um ${kind === "service" ? "serviço" : "produto"} com esse nome ou código.` : "Não foi possível salvar.", kind);
   back("ok", id ? "Item atualizado." : "Item cadastrado.", kind);
-}
-
-async function importCsv(form: FormData) {
-  "use server";
-  const { sb, orgId } = await requireOrg();
-  const kind = form.get("kind") === "product" ? "product" : "service";
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) back("error", "Escolha o arquivo CSV.", kind);
-  if (file.size > 1024 * 1024) back("error", "Arquivo maior que 1 MB. Divida a planilha em partes.", kind);
-  if (/\.xlsx?$/i.test(file.name)) back("error", "Esse arquivo é do Excel (.xlsx). No Excel, use Arquivo → Salvar como → CSV (separado por vírgulas) e importe o .csv.", kind);
-
-  const plan = planCatalogImport(parseCsv(decodeCsv(new Uint8Array(await file.arrayBuffer()))), kind);
-  const problems = plan.errors.length
-    ? ` ${plan.errors.length} linha(s) ignorada(s): ${plan.errors.slice(0, 5).join(" ")}${plan.errors.length > 5 ? " …" : ""}`
-    : "";
-  if (!plan.items.length) back("error", `Nada para importar.${problems}`, kind);
-
-  const { data: existing, error: readError } = await sb.from("catalog_items").select("id, kind, code, name").eq("org_id", orgId).limit(20000);
-  if (readError) back("error", "Não foi possível ler o cadastro atual.", kind);
-  const byName = new Map((existing ?? []).map((e) => [`${e.kind}|${String(e.name).toLowerCase()}`, e.id as string]));
-  const byCode = new Map((existing ?? []).filter((e) => e.code).map((e) => [`${e.kind}|${String(e.code).toLowerCase()}`, e.id as string]));
-  // Same code = same item (the name may have changed); otherwise same name.
-  const match = (i: (typeof plan.items)[number]) =>
-    (i.code ? byCode.get(`${i.kind}|${i.code.toLowerCase()}`) : undefined) ?? byName.get(`${i.kind}|${i.name.toLowerCase()}`);
-  const now = new Date().toISOString();
-
-  const inserts = plan.items
-    .filter((i) => !match(i))
-    .map((i) => ({ org_id: orgId, kind: i.kind, code: i.code, name: i.name, unit: i.unit ?? "un", price_cents: i.price_cents ?? 0, updated_at: now }));
-  const updates = plan.items
-    .map((i) => ({ i, id: match(i) }))
-    .filter((u): u is { i: (typeof plan.items)[number]; id: string } => !!u.id);
-
-  let failed = 0;
-  for (let k = 0; k < inserts.length; k += 500) {
-    const chunk = inserts.slice(k, k + 500);
-    const { error } = await sb.from("catalog_items").insert(chunk);
-    if (error) {
-      // One bad row fails the whole batch: retry one by one so only that row is lost.
-      for (const row of chunk) if ((await sb.from("catalog_items").insert(row)).error) failed++;
-    }
-  }
-  for (let k = 0; k < updates.length; k += 25) {
-    const results = await Promise.all(
-      updates.slice(k, k + 25).map(({ i, id }) =>
-        sb
-          .from("catalog_items")
-          .update({
-            active: true,
-            updated_at: now,
-            name: i.name,
-            ...(i.code !== null ? { code: i.code } : {}),
-            ...(i.unit !== null ? { unit: i.unit } : {}),
-            ...(i.price_cents !== null ? { price_cents: i.price_cents } : {}),
-          })
-          .eq("id", id)
-          .eq("org_id", orgId),
-      ),
-    );
-    failed += results.filter((r) => r.error).length;
-  }
-  const where = (k: string) => plan.items.filter((i) => i.kind === k).length;
-  const split = [where("service") ? `${where("service")} em Serviços` : "", where("product") ? `${where("product")} em Produtos` : ""].filter(Boolean).join(" e ");
-  const done = `Importação concluída: ${inserts.length} novo(s), ${updates.length} atualizado(s) — ${split}.`;
-  const fail = failed ? ` ${failed} item(ns) não foram salvos; tente importar de novo.` : "";
-  back(failed ? "error" : "ok", done + fail + problems, kind);
 }
 
 async function toggle(form: FormData) {
@@ -143,8 +80,8 @@ async function saveAdjustments(form: FormData) {
   back("ok", "Ajustes de preço por atendimento salvos.", String(form.get("kind")));
 }
 
-export default async function CatalogPage({ searchParams }: { searchParams: Promise<{ tipo?: string; q?: string; error?: string; ok?: string }> }) {
-  const { tipo, q, error, ok } = await searchParams;
+export default async function CatalogPage({ searchParams }: { searchParams: Promise<{ tipo?: string; q?: string; error?: string; ok?: string; importacao?: string }> }) {
+  const { tipo, q, error, ok, importacao } = await searchParams;
   const kind = tipo === "product" ? "product" : "service";
   const { sb, orgId, orgName } = await requireOrg();
   let query = sb.from("catalog_items").select("id, kind, code, name, unit, price_cents, active, track_stock, stock_qty").eq("org_id", orgId).eq("kind", kind).order("active", { ascending: false }).order("name");
@@ -156,6 +93,10 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     query.limit(500),
     sb.from("price_lists").select("attendance_type, adjust_pct").eq("org_id", orgId).not("attendance_type", "is", null),
   ]);
+  const { data: draft } = importacao
+    ? await sb.from("catalog_imports").select("id, kind, file_name, items, errors, total").eq("id", importacao).eq("org_id", orgId).maybeSingle()
+    : { data: null };
+  const match = draft ? await catalogMatcher(sb, orgId) : null;
   const adj = Object.fromEntries((priceLists ?? []).map((p) => [p.attendance_type as string, Number(p.adjust_pct)]));
 
   return (
@@ -199,6 +140,13 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         </div>
       </form>
 
+      {draft && match ? (
+        <ImportPreview
+          draft={{ ...draft, items: draft.items as ImportItem[], errors: draft.errors as string[] }}
+          match={match}
+        />
+      ) : null}
+
       <details className="card" style={{ marginBottom: 16 }}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>Importar planilha (CSV)</summary>
         <form action={importCsv} style={{ marginTop: 12 }}>
@@ -207,12 +155,12 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             Colunas, em qualquer ordem: <strong>Código</strong>, <strong>Tipo</strong> (Serviço ou Produto), <strong>Nome</strong> (ou Produto/Descrição),{" "}
             <strong>Unidade</strong> e <strong>Preço</strong> (ou Valor de Venda). Só o nome é obrigatório. Sem a coluna Tipo, entra tudo como{" "}
             {kind === "service" ? "serviço" : "produto"} (a aba aberta agora). Item já cadastrado com o mesmo código ou
-            nome é atualizado; célula vazia mantém o que já está. No Excel, salve como <em>CSV (separado por vírgulas)</em>; no Google Planilhas, <em>Arquivo → Fazer download → CSV</em>.{" "}
+            nome é atualizado; célula vazia mantém o que já está. Antes de gravar, o sistema mostra a planilha para você conferir e escolher <strong>Salvar planilha</strong> ou <strong>Deletar planilha</strong>. No Excel, salve como <em>CSV (separado por vírgulas)</em>; no Google Planilhas, <em>Arquivo → Fazer download → CSV</em>.{" "}
             <a href="/cadastros/itens/modelo">Baixar planilha modelo</a>
           </p>
           <div className="row" style={{ alignItems: "center" }}>
             <input type="file" name="file" accept=".csv,text/csv" required style={{ width: "auto" }} />
-            <button className="btn btn-primary">Importar</button>
+            <button className="btn btn-primary">Ler planilha</button>
           </div>
         </form>
       </details>
