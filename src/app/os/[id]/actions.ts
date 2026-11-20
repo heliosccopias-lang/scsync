@@ -187,7 +187,6 @@ export async function updateDetails(form: FormData) {
     .update({
       technician_id: s("technician_id"),
       second_technician_id: s("second_technician_id"),
-      km_at_open: s("km_at_open") && /^\d+$/.test(String(s("km_at_open")).replace(/\D/g, "")) ? Number(String(s("km_at_open")).replace(/\D/g, "")) : null,
       delivery_date: delivery && /^\d{4}-\d{2}-\d{2}$/.test(delivery) ? delivery : null,
       attendance_type: attendance && ["internal", "external", "warranty"].includes(attendance) ? attendance : "external",
       equipment: s("equipment"),

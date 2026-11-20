@@ -26,7 +26,6 @@ export type SheetData = {
   org: { name: string; cnpj: string | null };
   customer: { name: string; cpf_cnpj: string | null; email: string | null; phone: string | null } | null;
   technician: string | null;
-  vehicle?: string | null;
   items: { id: string; kind: string; description: string; quantity: number; unit_price_cents: number; total_cents: number; rejected: boolean }[];
   installments: { id: string; number: number; due_date: string; method: string; amount_cents: number }[];
 };
@@ -95,12 +94,6 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
             <div>
               <span>Técnico</span>
               {data.technician}
-            </div>
-          ) : null}
-          {data.vehicle ? (
-            <div>
-              <span>Veículo</span>
-              {data.vehicle}
             </div>
           ) : null}
           <div className="wide">

@@ -7,7 +7,7 @@ type Client = { from: (t: string) => any }; // eslint-disable-line @typescript-e
 export async function loadSheet(sb: Client, filter: { column: "id" | "share_token"; value: string; orgId?: string }) {
   let q = sb
     .from("service_orders")
-    .select("*, customers(name, cpf_cnpj, email, phone), orgs(name, cnpj), technicians!service_orders_technician_id_fkey(name), vehicles(plate, model)")
+    .select("*, customers(name, cpf_cnpj, email, phone), orgs(name, cnpj), technicians!service_orders_technician_id_fkey(name)")
     .eq(filter.column, filter.value);
   if (filter.orgId) q = q.eq("org_id", filter.orgId);
   const { data: os } = await q.maybeSingle();
@@ -23,7 +23,6 @@ export async function loadSheet(sb: Client, filter: { column: "id" | "share_toke
     org: os.orgs,
     customer: os.customers,
     technician: os.technicians?.name ?? null,
-    vehicle: os.vehicles ? `${os.vehicles.plate}${os.vehicles.model ? ` · ${os.vehicles.model}` : ""}${os.km_at_open != null ? ` · ${Number(os.km_at_open).toLocaleString("pt-BR")} km` : ""}` : null,
     items: items ?? [],
     installments: installments ?? [],
   };

@@ -85,19 +85,6 @@ export function NewOrderForm({
             </div>
           ) : null}
         </div>
-        <div className="grid2">
-          <div className="field">
-            <label htmlFor="plate">Placa do veículo (oficinas, opcional)</label>
-            <input id="plate" name="plate" placeholder="ABC1D23" defaultValue={v.plate} {...bad("plate")} />
-          </div>
-          <div className="field">
-            <label htmlFor="vehicle_model">Modelo / KM de entrada</label>
-            <div className="row" style={{ flexWrap: "nowrap" }}>
-              <input id="vehicle_model" name="vehicle_model" placeholder="Modelo (se a placa for nova)" defaultValue={v.vehicle_model} />
-              <input name="km" inputMode="numeric" placeholder="KM" aria-label="KM de entrada" defaultValue={v.km} style={{ width: 110 }} />
-            </div>
-          </div>
-        </div>
         <div className="field">
           <label htmlFor="customer_id">Cliente cadastrado</label>
           <select id="customer_id" name="customer_id" defaultValue={v.customer_id ?? ""}>

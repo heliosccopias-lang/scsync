@@ -25,7 +25,6 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
               <Link href="/cadastros/clientes">Clientes</Link>
               <Link href="/cadastros/itens">Serviços e produtos</Link>
               <Link href="/cadastros/tecnicos">Técnicos</Link>
-              <Link href="/cadastros/veiculos">Veículos</Link>
               <Link href="/cadastros/checklists">Checklists</Link>
             </div>
           </details>

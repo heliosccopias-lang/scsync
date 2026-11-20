@@ -52,7 +52,7 @@ export default async function ServiceOrderPage({
   const { data: os } = await sb
     .from("service_orders")
     .select(
-      "*, customers(id, name, cpf_cnpj, email, phone), technicians!service_orders_technician_id_fkey(name), second:technicians!service_orders_second_technician_id_fkey(name), vehicles(plate, model)",
+      "*, customers(id, name, cpf_cnpj, email, phone), technicians!service_orders_technician_id_fkey(name), second:technicians!service_orders_second_technician_id_fkey(name)",
     )
     .eq("id", id)
     .eq("org_id", orgId)
@@ -126,7 +126,6 @@ export default async function ServiceOrderPage({
   const publicUrl = `${appUrl}/p/${os.share_token}`;
   const technicianName = (os.technicians as unknown as { name: string } | null)?.name ?? null;
   const secondName = (os.second as unknown as { name: string } | null)?.name ?? null;
-  const vehicle = os.vehicles as unknown as { plate: string; model: string | null } | null;
   const shareWa = whatsappLink(
     (os.customers as unknown as { phone: string | null } | null)?.phone,
     [
@@ -237,16 +236,6 @@ export default async function ServiceOrderPage({
               {technicianName ?? "—"}
               {secondName ? ` e ${secondName}` : ""}
             </dd>
-            {vehicle ? (
-              <>
-                <dt>Veículo</dt>
-                <dd>
-                  {vehicle.plate}
-                  {vehicle.model ? ` · ${vehicle.model}` : ""}
-                  {os.km_at_open != null ? ` · ${Number(os.km_at_open).toLocaleString("pt-BR")} km` : ""}
-                </dd>
-              </>
-            ) : null}
             <dt>Atendimento</dt>
             <dd>{ATTENDANCE_LABEL[os.attendance_type] ?? os.attendance_type}</dd>
             <dt>Entrega prevista</dt>
@@ -306,10 +295,6 @@ export default async function ServiceOrderPage({
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="d_km">KM de entrada</label>
-                  <input id="d_km" name="km_at_open" inputMode="numeric" defaultValue={os.km_at_open ?? ""} />
                 </div>
                 <div className="field">
                   <label htmlFor="d_att">Atendimento</label>
