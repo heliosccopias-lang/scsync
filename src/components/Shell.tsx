@@ -18,6 +18,7 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
               <Link href="/receber">Contas a receber</Link>
               <Link href="/pagar">Contas a pagar</Link>
               <Link href="/conciliacao">Conciliação bancária</Link>
+              <Link href="/cartoes">Conciliação de cartão de crédito</Link>
             </div>
           </details>
           <Link href="/relatorios">Relatórios</Link>
@@ -36,6 +37,8 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
               <Link href="/configuracoes/asaas">Conexão Asaas</Link>
               <Link href="/configuracoes/contas">Contas bancárias</Link>
               <Link href="/configuracoes/financeiro">Juros, categorias e condições</Link>
+              <Link href="/configuracoes/cartoes">Cartões de crédito</Link>
+              <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link>
             </div>
           </details>
         </nav>
