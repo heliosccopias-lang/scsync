@@ -14,8 +14,8 @@ function pct(v: FormDataEntryValue | null) {
 
 async function saveFees(form: FormData) {
   "use server";
-  const { sb, orgId, role } = await requireOrg();
-  if (!["owner", "admin"].includes(role)) back("error", "Só o administrador altera juros e multa.");
+  const { sb, orgId, can } = await requireOrg();
+  if (!can("settings")) back("error", "Só o administrador altera juros e multa.");
   const fine = pct(form.get("fine_pct"));
   const interest = pct(form.get("interest_month_pct"));
   if (!(fine >= 0 && fine <= 2)) back("error", "Multa entre 0% e 2% (limite do Código de Defesa do Consumidor).");

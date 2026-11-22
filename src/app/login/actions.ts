@@ -9,7 +9,7 @@ export async function signIn(form: FormData) {
   const sb = await supabaseUser();
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) redirect(`/login?error=${encodeURIComponent("E-mail ou senha inválidos.")}`);
-  redirect("/os");
+  redirect("/");
 }
 
 export async function signUp(form: FormData) {

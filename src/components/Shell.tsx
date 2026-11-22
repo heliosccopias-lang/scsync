@@ -1,8 +1,34 @@
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { MenuCloser } from "./MenuCloser";
+import { requireOrg } from "@/lib/session";
+import { canOpen } from "@/lib/access";
+import { switchOrg } from "@/app/empresa/actions";
 
-export function Shell({ orgName, children }: { orgName: string; children: React.ReactNode }) {
+/** Top bar: menu filtered by the user's profile and the company's modules, company switcher, account links. */
+export async function Shell({ children }: { orgName?: string; children: React.ReactNode }) {
+  const ctx = await requireOrg();
+  const ok = (path: string) => canOpen(path, ctx);
+  const group = (label: string, links: [string, string][]) => {
+    const visible = links.filter(([href]) => ok(href));
+    if (!visible.length) return null;
+    return (
+      <details className="menu">
+        <summary>{label}</summary>
+        <div className="menu-list">
+          {visible.map(([href, text]) => (
+            <Link key={href} href={href}>
+              {text}
+            </Link>
+          ))}
+        </div>
+      </details>
+    );
+  };
+  const trialDays =
+    ctx.account?.status === "trial" && ctx.account.trial_ends_at
+      ? Math.ceil((Date.parse(`${ctx.account.trial_ends_at}T23:59:59-03:00`) - Date.now()) / 86_400_000)
+      : null;
   return (
     <>
       <MenuCloser />
@@ -11,44 +37,68 @@ export function Shell({ orgName, children }: { orgName: string; children: React.
           SC<span>sync</span>
         </div>
         <nav>
-          <Link href="/os">Ordens de serviço</Link>
-          <details className="menu">
-            <summary>Financeiro</summary>
-            <div className="menu-list">
-              <Link href="/receber">Contas a receber</Link>
-              <Link href="/pagar">Contas a pagar</Link>
-              <Link href="/conciliacao">Conciliação bancária</Link>
-              <Link href="/cartoes">Conciliação de cartão de crédito</Link>
-            </div>
-          </details>
-          <Link href="/relatorios">Relatórios</Link>
-          <details className="menu">
-            <summary>Cadastros</summary>
-            <div className="menu-list">
-              <Link href="/cadastros/clientes">Clientes</Link>
-              <Link href="/cadastros/itens">Serviços e produtos</Link>
-              <Link href="/cadastros/tecnicos">Técnicos</Link>
-              <Link href="/cadastros/checklists">Checklists</Link>
-            </div>
-          </details>
-          <details className="menu">
-            <summary>Configurações</summary>
-            <div className="menu-list">
-              <Link href="/configuracoes/asaas">Conexão Asaas</Link>
-              <Link href="/configuracoes/contas">Contas bancárias</Link>
-              <Link href="/configuracoes/financeiro">Juros, categorias e condições</Link>
-              <Link href="/configuracoes/cartoes">Cartões de crédito</Link>
-              <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link>
-            </div>
-          </details>
+          {ok("/os") ? <Link href="/os">Ordens de serviço</Link> : null}
+          {group("Financeiro", [
+            ["/receber", "Contas a receber"],
+            ["/pagar", "Contas a pagar"],
+            ["/conciliacao", "Conciliação bancária"],
+            ["/cartoes", "Conciliação de cartão de crédito"],
+          ])}
+          {ok("/relatorios") ? <Link href="/relatorios">Relatórios</Link> : null}
+          {group("Cadastros", [
+            ["/cadastros/clientes", "Clientes"],
+            ["/cadastros/itens", "Serviços e produtos"],
+            ["/cadastros/tecnicos", "Técnicos"],
+            ["/cadastros/checklists", "Checklists"],
+          ])}
+          {group("Configurações", [
+            ["/configuracoes/asaas", "Conexão Asaas"],
+            ["/configuracoes/contas", "Contas bancárias"],
+            ["/configuracoes/financeiro", "Juros, categorias e condições"],
+            ["/configuracoes/cartoes", "Cartões de crédito"],
+            ["/configuracoes/whatsapp", "Robô de WhatsApp"],
+          ])}
+          {ctx.isOwner ? <Link href="/conta">Conta</Link> : null}
         </nav>
-        <span className="org">{orgName}</span>
-        <form action={signOut}>
-          <button className="btn btn-secondary" style={{ padding: "5px 10px", fontSize: 13 }}>
-            Sair
-          </button>
-        </form>
+        {ctx.orgs.length > 1 ? (
+          <form action={switchOrg} className="org" style={{ display: "flex", gap: 4 }}>
+            <select name="org_id" defaultValue={ctx.orgId} aria-label="Empresa atual" style={{ padding: "4px 6px", fontSize: 13, width: "auto" }}>
+              {ctx.orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: 12 }}>
+              Trocar
+            </button>
+          </form>
+        ) : (
+          <span className="org">{ctx.orgName}</span>
+        )}
+        <details className="menu">
+          <summary style={{ fontSize: 13 }}>{ctx.userName.split("@")[0]}</summary>
+          <div className="menu-list" style={{ right: 0, left: "auto" }}>
+            <Link href="/minha-senha">Trocar minha senha</Link>
+            <form action={signOut}>
+              <button className="btn btn-secondary" style={{ width: "100%", marginTop: 4 }}>
+                Sair
+              </button>
+            </form>
+          </div>
+        </details>
       </header>
+      {trialDays !== null && trialDays >= 0 ? (
+        <div className="notice" style={{ margin: 0, borderRadius: 0, textAlign: "center", background: "var(--orange-soft)", color: "var(--orange-ink)" }}>
+          Período de teste: {trialDays === 0 ? "termina hoje" : `${trialDays} dia(s) restante(s)`}.
+          {ctx.isOwner ? (
+            <>
+              {" "}
+              <Link href="/conta">Ativar assinatura</Link>
+            </>
+          ) : null}
+        </div>
+      ) : null}
       <main>{children}</main>
     </>
   );

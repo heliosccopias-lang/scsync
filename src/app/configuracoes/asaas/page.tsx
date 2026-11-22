@@ -7,13 +7,13 @@ import { supabaseAdmin } from "@/lib/supabase";
 
 async function connect(form: FormData) {
   "use server";
-  const { orgId, role, user } = await requireOrg();
+  const { orgId, isOwner, user } = await requireOrg();
   const back = (msg: string, detail?: unknown): never => {
     // Logged without the key, so the reason shows up in Vercel's runtime logs.
     console.warn("[asaas-connect] failed", { orgId, msg, detail });
     redirect(`/configuracoes/asaas?error=${encodeURIComponent(msg)}`);
   };
-  if (!["owner", "admin"].includes(role)) back("Só o administrador da empresa pode conectar o Asaas.");
+  if (!isOwner) back("Só o Dono da conta pode conectar o Asaas.");
 
   const env = (form.get("environment") === "production" ? "production" : "sandbox") as AsaasEnvironment;
   const apiKey = String(form.get("apiKey") ?? "").trim();

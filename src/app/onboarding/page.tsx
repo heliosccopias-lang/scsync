@@ -2,34 +2,52 @@ import { redirect } from "next/navigation";
 import { Notice } from "@/components/Shell";
 import { requireUser } from "@/lib/session";
 
-async function createOrg(form: FormData) {
+async function createAccount(form: FormData) {
   "use server";
   const { sb } = await requireUser();
-  const { error } = await sb.rpc("create_org", {
-    p_name: String(form.get("name") ?? ""),
-    p_cnpj: String(form.get("cnpj") ?? ""),
+  const model = ["services", "products", "both"].includes(String(form.get("model"))) ? String(form.get("model")) : "both";
+  const { error } = await sb.rpc("create_account", {
+    p_account: String(form.get("company") ?? ""),
+    p_company: String(form.get("company") ?? ""),
+    p_cnpj: String(form.get("cnpj") ?? "").replace(/\D/g, ""),
+    p_model: model,
+    p_name: String(form.get("name") ?? "").trim(),
   });
-  if (error) redirect(`/onboarding?error=${encodeURIComponent("Não foi possível criar a empresa.")}`);
-  redirect("/configuracoes/asaas");
+  if (error?.message === "already_has_account") redirect("/");
+  if (error) redirect(`/onboarding?error=${encodeURIComponent("Não foi possível criar a conta.")}`);
+  redirect("/");
 }
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await requireUser();
   const { error } = await searchParams;
   return (
-    <main style={{ maxWidth: 480, paddingTop: 60 }}>
-      <h1>Sua empresa</h1>
+    <main style={{ maxWidth: 520, paddingTop: 60 }}>
+      <h1>Bem-vindo ao SCsync</h1>
+      <p className="muted">Teste grátis por 14 dias. Você será o Dono da conta: cria as empresas, liga os módulos e cadastra a equipe.</p>
       <Notice error={error} />
-      <form action={createOrg} className="card">
+      <form action={createAccount} className="card">
         <div className="field">
-          <label htmlFor="name">Nome da empresa</label>
+          <label htmlFor="name">Seu nome</label>
           <input id="name" name="name" required />
+        </div>
+        <div className="field">
+          <label htmlFor="company">Nome da gráfica</label>
+          <input id="company" name="company" required />
         </div>
         <div className="field">
           <label htmlFor="cnpj">CNPJ (opcional)</label>
           <input id="cnpj" name="cnpj" inputMode="numeric" />
         </div>
-        <button className="btn btn-primary">Continuar</button>
+        <div className="field">
+          <label htmlFor="model">O que a empresa vende?</label>
+          <select id="model" name="model" defaultValue="both">
+            <option value="both">Serviços e produtos</option>
+            <option value="services">Só serviços</option>
+            <option value="products">Só produtos</option>
+          </select>
+        </div>
+        <button className="btn btn-primary">Começar o teste</button>
       </form>
     </main>
   );
