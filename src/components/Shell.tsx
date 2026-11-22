@@ -37,7 +37,14 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
         <div className="brand">
           SC<span>sync</span>
         </div>
-        <nav>
+        {/* Mobile: the menu button toggles the nav (pure CSS, no script). */}
+        <input type="checkbox" id="nav-toggle" className="nav-toggle" aria-hidden="true" />
+        <label htmlFor="nav-toggle" className="nav-burger" aria-label="Abrir menu">
+          <span />
+          <span />
+          <span />
+        </label>
+        <nav className="topnav">
           {group("Ordens de serviço", [
             ["/os", "Todas as ordens de serviço"],
             ["/os/nova", "Nova ordem de serviço"],
@@ -88,7 +95,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
         ) : (
           <span className="org">{ctx.orgName}</span>
         )}
-        <details className="menu">
+        <details className="menu usermenu">
           <summary style={{ fontSize: 13 }}>{ctx.userName.split("@")[0]}</summary>
           <div className="menu-list" style={{ right: 0, left: "auto" }}>
             <Link href="/minha-senha">Trocar minha senha</Link>

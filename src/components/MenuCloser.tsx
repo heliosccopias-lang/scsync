@@ -11,6 +11,11 @@ export function MenuCloser() {
     const menus = () => Array.from(document.querySelectorAll<HTMLDetailsElement>(".topbar details.menu[open]"));
     const onClick = (e: MouseEvent) => {
       const target = e.target as Element | null;
+      // Mobile: picking a screen closes the menu panel.
+      if (target?.closest(".topnav a")) {
+        const t = document.getElementById("nav-toggle") as HTMLInputElement | null;
+        if (t) t.checked = false;
+      }
       for (const m of menus()) {
         const inside = !!target && m.contains(target);
         const pickedItem = inside && !!target?.closest(".menu-list a");

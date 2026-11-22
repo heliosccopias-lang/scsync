@@ -140,3 +140,29 @@ details > summary.btn::-webkit-details-marker { display: none; }
 .lp-final h2 { margin: 0 0 20px; font-size: 26px; }
 .lp-foot { padding: 24px 0; color: var(--ink-2); font-size: 13px; }
 @media (max-width: 640px) { .lp-top nav a:not(:last-child) { display: none; } .lp-hero { padding: 56px 0 64px; } }
+
+/* ---------- Mobile top bar ---------- */
+.nav-toggle { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+.nav-burger { display: none; cursor: pointer; flex-direction: column; justify-content: center; gap: 4px; padding: 8px; margin: 0; }
+.nav-burger span { display: block; width: 22px; height: 2px; border-radius: 2px; background: #e9e4dc; }
+@media (max-width: 900px) {
+  .topbar { flex-wrap: wrap; height: auto; min-height: 56px; padding: 6px 12px; gap: 8px 12px; position: relative; }
+  .topbar .brand { order: 1; }
+  .topbar .org { order: 2; margin-left: auto; font-size: 12px; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .usermenu { order: 3; }
+  .nav-burger { display: flex; order: 4; }
+  .topbar .topnav { order: 5; display: none; flex: 0 0 100%; flex-direction: column; gap: 0; padding: 4px 0 10px; border-top: 1px solid #45423e; }
+  .nav-toggle:checked ~ .topnav { display: flex; }
+  .topbar .topnav > a, .topbar .topnav .menu > summary { display: block; padding: 12px 4px; font-size: 15px; border-bottom: 1px solid #3d3a37; }
+  .topbar .topnav .menu-list { position: static; min-width: 0; padding: 0 0 6px 14px; background: transparent; border: 0; box-shadow: none; }
+  .topbar .topnav .menu-list a { color: #e9e4dc !important; padding: 10px 6px; }
+  .topbar .topnav .menu-list a:hover { background: transparent; color: var(--orange) !important; }
+  .topbar .usermenu .menu-list { right: 0; left: auto; }
+  main { padding: 16px 12px 48px; }
+  h1 { font-size: 19px; }
+  .spread { flex-wrap: wrap; }
+  /* Wide tables scroll sideways instead of breaking the page. */
+  main table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  main th, main td { white-space: nowrap; }
+  .card { padding: 14px; }
+}
