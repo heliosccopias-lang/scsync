@@ -11,6 +11,8 @@ describe("SCsync plans", () => {
     expect(planAllows("servicos", "active", "os")).toBe(true);
     expect(planAllows("servicos", "trial", "stock")).toBe(true);
     expect(planAllows("servicos_produtos", "active", "stock")).toBe(true);
+    expect(planAllows("servicos_produtos", "active", "nfse")).toBe(false);
+    expect(planAllows("completo", "active", "nfse")).toBe(true);
   });
   it("a paid charge covers one cycle", () => {
     expect(coveredUntil("2026-01-31", "monthly")).toBe("2026-02-28");

@@ -24,6 +24,60 @@ export const WEBHOOK_EVENTS = [
   "PAYMENT_CHARGEBACK_REQUESTED",
 ] as const;
 
+// Invoice (NFS-e) events, from docs.asaas.com/docs/webhook-para-notas-fiscais. Sent to a separate webhook.
+export const INVOICE_WEBHOOK_EVENTS = [
+  "INVOICE_CREATED",
+  "INVOICE_UPDATED",
+  "INVOICE_SYNCHRONIZED",
+  "INVOICE_AUTHORIZED",
+  "INVOICE_PROCESSING_CANCELLATION",
+  "INVOICE_CANCELED",
+  "INVOICE_CANCELLATION_DENIED",
+  "INVOICE_ERROR",
+] as const;
+
+export interface AsaasInvoice {
+  id: string;
+  status: string;
+  customer?: string | null;
+  payment?: string | null;
+  number?: string | null;
+  pdfUrl?: string | null;
+  xmlUrl?: string | null;
+  statusDescription?: string | null;
+  validationCode?: string | null;
+  value?: number;
+  effectiveDate?: string;
+  externalReference?: string | null;
+}
+
+export interface AsaasMunicipalOptions {
+  authenticationType: "CERTIFICATE" | "TOKEN" | "USER_AND_PASSWORD";
+  supportsCancellation: boolean;
+  usesSpecialTaxRegimes: boolean;
+  usesServiceListItem: boolean;
+  specialTaxRegimesList?: { label: string; value: string }[] | null;
+  nationalPortalTaxCalculationRegimeList?: { label: string; value: string }[] | null;
+  nationalPortalTaxCalculationRegimeHelp?: string | null;
+  municipalInscriptionHelp?: string | null;
+  specialTaxRegimeHelp?: string | null;
+  serviceListItemHelp?: string | null;
+  digitalCertificatedHelp?: string | null;
+  accessTokenHelp?: string | null;
+  municipalServiceCodeHelp?: string | null;
+}
+
+export type AsaasInvoiceTaxes = {
+  retainIss: boolean;
+  iss: number;
+  pis: number;
+  cofins: number;
+  csll: number;
+  inss: number;
+  ir: number;
+  pisCofinsTaxStatus?: string;
+};
+
 export class AsaasError extends Error {
   constructor(
     message: string,
@@ -65,6 +119,20 @@ export class AsaasClient {
     private fetchImpl: typeof fetch = fetch,
   ) {}
 
+  /** multipart/form-data (fiscalInfo takes the certificate file). */
+  private async requestForm<T>(path: string, form: FormData): Promise<T> {
+    const res = await this.fetchImpl(`${BASE[this.env]}${path}`, {
+      method: "POST",
+      headers: { access_token: this.apiKey, "User-Agent": "SCsync/0.1" },
+      body: form,
+      cache: "no-store",
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new AsaasError(data?.errors?.[0]?.description ?? `Asaas HTTP ${res.status}`, res.status, data);
+    return data as T;
+  }
+
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await this.fetchImpl(`${BASE[this.env]}${path}`, {
       method,
@@ -94,7 +162,10 @@ export class AsaasClient {
     return this.request<{ id: string }>("POST", "/customers", input);
   }
 
-  updateCustomer(id: string, input: { name?: string; cpfCnpj?: string; email?: string | null; mobilePhone?: string | null }) {
+  updateCustomer(
+    id: string,
+    input: { name?: string; cpfCnpj?: string; email?: string | null; mobilePhone?: string | null; postalCode?: string; addressNumber?: string; complement?: string | null },
+  ) {
     return this.request<{ id: string }>("POST", `/customers/${encodeURIComponent(id)}`, input);
   }
 
@@ -160,6 +231,72 @@ export class AsaasClient {
 
   deleteSubscription(id: string) {
     return this.request<{ deleted: boolean }>("DELETE", `/subscriptions/${encodeURIComponent(id)}`);
+  }
+
+  // ---- NFS-e (notas fiscais de serviço)
+  municipalOptions() {
+    return this.request<AsaasMunicipalOptions>("GET", "/fiscalInfo/municipalOptions");
+  }
+
+  /** null when the account has no fiscal configuration yet (HTTP 404). */
+  async getFiscalInfo() {
+    try {
+      return await this.request<Record<string, unknown>>("GET", "/fiscalInfo/");
+    } catch (e) {
+      if (e instanceof AsaasError && e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  saveFiscalInfo(form: FormData) {
+    return this.requestForm<Record<string, unknown>>("/fiscalInfo/", form);
+  }
+
+  municipalServices(description: string) {
+    const q = new URLSearchParams({ description, limit: "30" });
+    return this.request<{ data: { id: string; description: string; issTax?: number }[] }>("GET", `/fiscalInfo/services?${q}`);
+  }
+
+  createInvoice(input: {
+    payment?: string;
+    customer?: string;
+    serviceDescription: string;
+    observations: string;
+    externalReference?: string;
+    value: number;
+    deductions: number;
+    effectiveDate: string;
+    municipalServiceId?: string;
+    municipalServiceCode?: string;
+    municipalServiceName: string;
+    taxes: AsaasInvoiceTaxes;
+  }) {
+    return this.request<AsaasInvoice>("POST", "/invoices", input);
+  }
+
+  authorizeInvoice(id: string) {
+    return this.request<AsaasInvoice>("POST", `/invoices/${encodeURIComponent(id)}/authorize`);
+  }
+
+  cancelInvoice(id: string) {
+    return this.request<AsaasInvoice>("POST", `/invoices/${encodeURIComponent(id)}/cancel`);
+  }
+
+  getInvoice(id: string) {
+    return this.request<AsaasInvoice>("GET", `/invoices/${encodeURIComponent(id)}`);
+  }
+
+  createInvoiceWebhook(input: { url: string; email: string; authToken: string }) {
+    return this.request<{ id: string }>("POST", "/webhooks", {
+      name: "SCsync notas fiscais",
+      url: input.url,
+      email: input.email,
+      authToken: input.authToken,
+      enabled: true,
+      interrupted: false,
+      sendType: "SEQUENTIALLY",
+      events: INVOICE_WEBHOOK_EVENTS,
+    });
   }
 
   createWebhook(input: { name: string; url: string; email: string; authToken: string }) {

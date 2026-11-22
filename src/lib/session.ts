@@ -55,7 +55,7 @@ export const requireOrg = cache(async () => {
   // A module is on when the company turned it on and the plan includes it.
   const acc = account as { plan: string; status: string } | null;
   const modules: Record<string, boolean> = {};
-  for (const k of ["os", "stock", "commissions", "finance", "asaas", "bank_reconciliation", "cards"]) {
+  for (const k of ["os", "stock", "commissions", "finance", "asaas", "bank_reconciliation", "cards", "nfse"]) {
     modules[k] = (org.modules ?? {})[k] !== false && planAllows(acc?.plan, acc?.status ?? "trial", k);
   }
   const ctx = {

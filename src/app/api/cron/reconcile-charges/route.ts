@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { asaasFor, syncChargeFromAsaas } from "@/lib/charges";
 import { supabaseAdmin } from "@/lib/supabase";
+import { refreshInvoice } from "@/lib/nfse-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -32,5 +33,21 @@ export async function GET(req: Request) {
       results.error = (results.error ?? 0) + 1;
     }
   }
-  return NextResponse.json({ checked: open?.length ?? 0, results });
+  // Invoices (NFS-e) still in progress: re-read from Asaas in case an invoice webhook was lost.
+  const { data: pending } = await admin
+    .from("service_invoices")
+    .select("id, org_id")
+    .in("status", ["scheduled", "synchronized", "processing_cancellation"])
+    .not("asaas_invoice_id", "is", null)
+    .limit(500);
+  let invoices = 0;
+  for (const inv of pending ?? []) {
+    try {
+      await refreshInvoice(inv.org_id, inv.id);
+      invoices++;
+    } catch {
+      results.invoice_error = (results.invoice_error ?? 0) + 1;
+    }
+  }
+  return NextResponse.json({ checked: open?.length ?? 0, invoices, results });
 }

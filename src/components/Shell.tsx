@@ -45,6 +45,11 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
             ["/conciliacao", "Conciliação bancária"],
             ["/cartoes", "Conciliação de cartão de crédito"],
           ])}
+          {group("Notas fiscais", [
+            ["/notas/nova", "Emitir nota avulsa"],
+            ["/notas", "Notas emitidas"],
+            ["/notas/configuracao", "Configuração fiscal"],
+          ])}
           {ok("/relatorios") ? <Link href="/relatorios">Relatórios</Link> : null}
           {group("Cadastros", [
             ["/cadastros/clientes", "Clientes"],

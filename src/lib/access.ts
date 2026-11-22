@@ -2,9 +2,9 @@
 
 export type Perm =
   | "os.view" | "os.edit" | "os.status" | "os.cancel" | "customers.edit" | "catalog.edit" | "prices.view"
-  | "finance.view" | "finance.receive" | "finance.edit" | "finance.reverse" | "reports" | "reports.commissions" | "settings" | "owner";
+  | "finance.view" | "finance.receive" | "finance.edit" | "finance.reverse" | "reports" | "reports.commissions" | "settings" | "fiscal.issue" | "owner";
 
-export type ModuleKey = "os" | "stock" | "commissions" | "finance" | "asaas" | "bank_reconciliation" | "cards";
+export type ModuleKey = "os" | "stock" | "commissions" | "finance" | "asaas" | "bank_reconciliation" | "cards" | "nfse";
 
 export const MODULES: { key: ModuleKey; label: string; help: string }[] = [
   { key: "os", label: "Ordem de serviço", help: "OS, orçamentos, checklists, produção, impressão e link do cliente" },
@@ -14,6 +14,7 @@ export const MODULES: { key: ModuleKey; label: string; help: string }[] = [
   { key: "asaas", label: "Cobrança Asaas", help: "Pix, boleto e baixa automática" },
   { key: "bank_reconciliation", label: "Conciliação bancária", help: "Extrato OFX e do Asaas" },
   { key: "cards", label: "Cartão de crédito e robô de WhatsApp", help: "Fatura por arquivo ou Pluggy e despesas pelo WhatsApp" },
+  { key: "nfse", label: "Nota fiscal de serviço (NFS-e)", help: "Emissão pela conta Asaas da empresa; plano Completo" },
 ];
 
 export const ROLES: { key: string; label: string; help: string }[] = [
@@ -41,14 +42,15 @@ export const PERMS: { key: Perm; label: string }[] = [
   { key: "reports", label: "Relatórios" },
   { key: "reports.commissions", label: "Relatório de comissões" },
   { key: "settings", label: "Configurações da empresa (contas, juros, técnicos, checklists)" },
+  { key: "fiscal.issue", label: "Emitir e cancelar notas fiscais" },
 ];
 
 const ROLE_PERMS: Record<string, Perm[]> = {
-  admin: ["os.view", "os.edit", "os.status", "os.cancel", "customers.edit", "catalog.edit", "prices.view", "finance.view", "finance.receive", "finance.edit", "finance.reverse", "reports", "reports.commissions", "settings"],
-  attendance: ["os.view", "os.edit", "os.status", "customers.edit", "prices.view", "finance.receive"],
+  admin: ["os.view", "os.edit", "os.status", "os.cancel", "customers.edit", "catalog.edit", "prices.view", "finance.view", "finance.receive", "finance.edit", "finance.reverse", "reports", "reports.commissions", "settings", "fiscal.issue"],
+  attendance: ["os.view", "os.edit", "os.status", "customers.edit", "prices.view", "finance.receive", "fiscal.issue"],
   production: ["os.view", "os.status"],
   products: ["catalog.edit", "prices.view", "os.view", "reports"],
-  finance: ["os.view", "customers.edit", "prices.view", "finance.view", "finance.receive", "finance.edit", "finance.reverse", "reports", "reports.commissions"],
+  finance: ["os.view", "customers.edit", "prices.view", "finance.view", "finance.receive", "finance.edit", "finance.reverse", "reports", "reports.commissions", "fiscal.issue"],
   viewer: ["os.view", "prices.view", "finance.view", "reports"],
 };
 /** Same table as role_perms() in the database (migration 0020). */
@@ -73,6 +75,9 @@ const RULES: Rule[] = [
   { prefix: "/conciliacao", module: "bank_reconciliation", any: ["finance.edit"] },
   { prefix: "/cartoes", module: "cards", any: ["finance.edit"] },
   { prefix: "/relatorios", any: ["reports"] },
+  { prefix: "/notas/configuracao", owner: true, module: "nfse" },
+  { prefix: "/notas/nova", module: "nfse", any: ["fiscal.issue"] },
+  { prefix: "/notas", module: "nfse", any: ["fiscal.issue", "finance.view"] },
 ];
 
 export type AccessCtx = { perms: ReadonlySet<string>; modules: Record<string, boolean | undefined>; isOwner: boolean };

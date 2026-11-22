@@ -16,7 +16,7 @@ export const PLANS: { key: PlanKey; name: string; monthlyCents: number; summary:
     monthlyCents: 32000,
     summary: "Para gráficas que vendem só serviços",
     features: ["Ordem de serviço, orçamentos e produção", "Financeiro, cobrança Pix/boleto (Asaas)", "Conciliação bancária e de cartão", "Robô de WhatsApp para despesas", "Usuários com perfis de acesso"],
-    blocked: ["stock"],
+    blocked: ["stock", "nfse"],
   },
   {
     key: "servicos_produtos",
@@ -24,14 +24,14 @@ export const PLANS: { key: PlanKey; name: string; monthlyCents: number; summary:
     monthlyCents: 42000,
     summary: "Serviços, venda de produtos e estoque",
     features: ["Tudo do plano Serviços", "Produtos com estoque e importação de planilha", "Baixa de estoque pelas OS", "Várias empresas (CNPJs) na mesma conta"],
-    blocked: [],
+    blocked: ["nfse"],
   },
   {
     key: "completo",
     name: "Completo com nota fiscal",
     monthlyCents: 48000,
     summary: "Tudo, mais emissão de nota fiscal",
-    features: ["Tudo do plano Serviços e Produtos", "Emissão de nota fiscal (NFS-e) integrada", "Suporte prioritário"],
+    features: ["Tudo do plano Serviços e Produtos", "Nota fiscal de serviço (NFS-e) na OS, avulsa ou automática ao receber", "Suporte prioritário"],
     blocked: [],
   },
 ];

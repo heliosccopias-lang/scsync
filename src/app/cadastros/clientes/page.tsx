@@ -23,8 +23,16 @@ async function save(form: FormData) {
     cpf_cnpj: doc || null,
     phone: String(form.get("phone") ?? "").trim() || null,
     email: String(form.get("email") ?? "").trim() || null,
+    // Address for the NFS-e (tomador): Asaas completes street and city from the CEP.
+    address: {
+      cep: onlyDigits(String(form.get("cep") ?? "")).slice(0, 8) || undefined,
+      number: String(form.get("addr_number") ?? "").trim().slice(0, 20) || undefined,
+      complement: String(form.get("addr_complement") ?? "").trim().slice(0, 60) || undefined,
+    },
     updated_at: new Date().toISOString(),
   };
+  const cep = (row.address.cep ?? "") as string;
+  if (cep && cep.length !== 8) back("error", "CEP inválido: use 8 números.");
   const { error } = id ? await sb.from("customers").update(row).eq("id", id).eq("org_id", orgId) : await sb.from("customers").insert(row);
   if (error) back("error", error.code === "23505" ? "Já existe um cliente com este CPF/CNPJ." : "Não foi possível salvar.");
   back("ok", id ? "Cliente atualizado." : "Cliente cadastrado.");
@@ -33,7 +41,7 @@ async function save(form: FormData) {
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; error?: string; ok?: string }> }) {
   const { q, error, ok } = await searchParams;
   const { sb, orgId, orgName } = await requireOrg();
-  let query = sb.from("customers").select("id, name, cpf_cnpj, phone, email").eq("org_id", orgId).order("name").limit(300);
+  let query = sb.from("customers").select("id, name, cpf_cnpj, phone, email, address").eq("org_id", orgId).order("name").limit(300);
   if (q) query = /^\d+$/.test(onlyDigits(q)) && onlyDigits(q).length >= 3 ? query.ilike("cpf_cnpj", `%${onlyDigits(q)}%`) : query.ilike("name", `%${q}%`);
   const { data: customers } = await query;
 
@@ -69,7 +77,22 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               <label htmlFor="n_email">E-mail</label>
               <input id="n_email" name="email" type="email" />
             </div>
+            <div className="row" style={{ flexWrap: "nowrap" }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="n_cep">CEP</label>
+                <input id="n_cep" name="cep" inputMode="numeric" />
+              </div>
+              <div className="field" style={{ width: 90 }}>
+                <label htmlFor="n_num">Número</label>
+                <input id="n_num" name="addr_number" />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label htmlFor="n_comp">Complemento</label>
+                <input id="n_comp" name="addr_complement" />
+              </div>
+            </div>
           </div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>CEP e número são pedidos pela prefeitura na nota fiscal.</p>
           <button className="btn btn-primary">Salvar cliente</button>
         </form>
       </details>
@@ -103,6 +126,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       <input name="cpf_cnpj" defaultValue={c.cpf_cnpj ?? ""} aria-label="CPF/CNPJ" style={{ flex: 1.2 }} />
                       <input name="phone" defaultValue={c.phone ?? ""} aria-label="Celular" style={{ flex: 1 }} />
                       <input name="email" defaultValue={c.email ?? ""} aria-label="E-mail" style={{ flex: 1.5 }} />
+                      <input name="cep" defaultValue={(c.address as { cep?: string })?.cep ?? ""} aria-label="CEP" placeholder="CEP" style={{ width: 100 }} />
+                      <input name="addr_number" defaultValue={(c.address as { number?: string })?.number ?? ""} aria-label="Número" placeholder="Nº" style={{ width: 60 }} />
+                      <input name="addr_complement" defaultValue={(c.address as { complement?: string })?.complement ?? ""} aria-label="Complemento" placeholder="Compl." style={{ width: 90 }} />
                       <button className="btn btn-secondary">Salvar</button>
                     </form>
                   </details>

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { tokenMatchesHash } from "@/lib/crypto";
+import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { autoIssueForPayment } from "@/lib/nfse-db";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ orgId: string 
   if (error) {
     console.error("asaas webhook failed", { orgId, error: error.message });
     return NextResponse.json({ error: "processing_failed" }, { status: 500 });
+  }
+  // Automatic NFS-e on payment (company setting), after answering Asaas.
+  const ev = event as { event?: string; payment?: { id?: string } };
+  if ((ev.event === "PAYMENT_RECEIVED" || ev.event === "PAYMENT_CONFIRMED") && ev.payment?.id) {
+    const paymentId = ev.payment.id;
+    after(() => autoIssueForPayment(orgId, paymentId));
   }
   return NextResponse.json({ received: true, result: data });
 }

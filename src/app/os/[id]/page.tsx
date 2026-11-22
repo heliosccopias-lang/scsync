@@ -11,6 +11,7 @@ import { asaasFor } from "@/lib/charges";
 import { ATTENDANCE_LABEL, fmtDate as fmtDay } from "@/lib/format";
 import { listAttachments, fmtSize } from "@/lib/attachments";
 import { Uploader } from "@/components/Uploader";
+import { InvoiceRows } from "@/app/notas/InvoiceRows";
 import { PrintSpecFields } from "@/components/PrintSpecFields";
 import { registerOsFiles } from "./files-actions";
 import { stockAction, addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
@@ -48,7 +49,15 @@ export default async function ServiceOrderPage({
 }) {
   const { id } = await params;
   const { error, ok } = await searchParams;
-  const { sb, orgId, orgName } = await requireOrg();
+  const { sb, orgId, orgName, module: hasModule, can } = await requireOrg();
+  const showNfse = hasModule("nfse") && (can("fiscal.issue") || can("finance.view"));
+  const { data: invoices } = showNfse
+    ? await sb
+        .from("service_invoices")
+        .select("id, effective_date, number, status, status_description, value_cents, pdf_url, xml_url, asaas_invoice_id, service_order_id, auto, customers(name), service_orders(number)")
+        .eq("service_order_id", id)
+        .order("created_at", { ascending: false })
+    : { data: [] as Record<string, unknown>[] };
 
   const { data: os } = await sb
     .from("service_orders")
@@ -152,6 +161,11 @@ export default async function ServiceOrderPage({
             <a className="btn btn-primary" href={shareWa} target="_blank" rel="noreferrer">
               Enviar {os.kind === "quote" ? "orçamento" : "OS"} por WhatsApp
             </a>
+          ) : null}
+          {showNfse && can("fiscal.issue") && os.kind !== "quote" ? (
+            <Link className="btn btn-secondary" href={`/notas/nova?os=${id}`}>
+              Nota fiscal
+            </Link>
           ) : null}
           <details className="menu-inline">
             <summary className="btn btn-secondary">Imprimir ▾</summary>
@@ -487,6 +501,12 @@ export default async function ServiceOrderPage({
           <Uploader orgId={orgId} folder={`service_order/${id}`} register={registerOsFiles} extra={{ os_id: id }} />
         </div>
       </div>
+      {showNfse && (invoices ?? []).length ? (
+        <>
+          <h2 style={{ marginTop: 28 }}>Notas fiscais</h2>
+          <InvoiceRows rows={(invoices ?? []) as Record<string, unknown>[]} back={`/os/${id}`} canIssue={can("fiscal.issue")} />
+        </>
+      ) : null}
       <div className="spread" style={{ marginTop: 28 }}>
         <h2 style={{ margin: 0 }}>Pagamento</h2>
         {!launched && os.kind !== "quote" && (installments ?? []).length > 0 ? (
