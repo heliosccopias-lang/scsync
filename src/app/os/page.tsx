@@ -48,7 +48,7 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
         <input name="q" placeholder="Nº da OS ou cliente" defaultValue={q} style={{ maxWidth: 280 }} />
         <select name="status" defaultValue={status ?? ""} style={{ maxWidth: 200 }}>
           <option value="">Todos os status</option>
-          {["open", "approved", "in_progress", "waiting_parts", "done", "cancelled"].map((s) => (
+          {["open", "approved", "in_progress", "waiting_parts", "done", "paid", "cancelled"].map((s) => (
             <option key={s} value={s}>
               {osStatusLabel(s)}
             </option>

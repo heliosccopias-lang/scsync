@@ -181,7 +181,7 @@ export default async function ServiceOrderPage({
           <form action={setStatus} className="row">
             <input type="hidden" name="id" value={id} />
             <select name="status" defaultValue={os.status} aria-label="Status da OS" style={{ width: 190 }}>
-              {["open", "approved", "in_progress", "waiting_parts", "done", "cancelled"].map((s) => (
+              {["open", "approved", "in_progress", "waiting_parts", "done", ...(os.status === "paid" ? ["paid"] : []), "cancelled"].map((s) => (
                 <option key={s} value={s}>
                   {osStatusLabel(s)}
                 </option>

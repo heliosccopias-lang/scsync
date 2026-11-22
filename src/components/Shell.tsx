@@ -38,7 +38,11 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
           SC<span>sync</span>
         </div>
         <nav>
-          {ok("/os") ? <Link href="/os">Ordens de serviço</Link> : null}
+          {group("Ordens de serviço", [
+            ["/os", "Todas as ordens de serviço"],
+            ["/os/nova", "Nova ordem de serviço"],
+            ["/os/pagas", "Ordens de serviço pagas"],
+          ])}
           {group("Financeiro", [
             ["/receber", "Contas a receber"],
             ["/pagar", "Contas a pagar"],
@@ -142,7 +146,8 @@ const OS_STATUS: Record<string, string> = {
   approved: "Aprovada",
   in_progress: "Em execução",
   waiting_parts: "Aguardando material",
-  done: "Concluída",
+  paid: "Paga",
+  done: "Concluída (aguardando pagamento)",
   delivered: "Entregue",
   cancelled: "Cancelada",
 };
