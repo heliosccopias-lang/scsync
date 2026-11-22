@@ -44,6 +44,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
             ["/pagar", "Contas a pagar"],
             ["/conciliacao", "Conciliação bancária"],
             ["/cartoes", "Conciliação de cartão de crédito"],
+            ["/configuracoes/conexoes", "Conexões bancárias (importação e API)"],
           ])}
           {group("Notas fiscais", [
             ["/notas/nova", "Emitir nota avulsa"],
