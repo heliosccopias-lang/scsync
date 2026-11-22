@@ -5,6 +5,8 @@ import { asaasFor } from "@/lib/charges";
 import { decodeOfx, parseOfx } from "@/lib/ofx";
 import { todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
+import { syncBankAccount } from "@/lib/bank-sync";
+import type { supabaseAdmin } from "@/lib/supabase";
 
 function back(conta: string, key: "error" | "ok", msg: string): never {
   redirect(`/conciliacao?conta=${conta}&${key}=${encodeURIComponent(msg)}`);
@@ -162,6 +164,23 @@ export async function importAsaas(form: FormData) {
   await sb.from("statement_imports").update({ lines_duplicate: rows.length - inserted }).eq("id", imp.id);
   const { data: auto } = await sb.rpc("auto_reconcile_provider_lines", { p_org: orgId });
   back(conta, "ok", `${inserted} lançamento(s) do Asaas importado(s); ${auto ?? 0} conciliado(s) automaticamente com os recebimentos já registrados.`);
+}
+
+/** Bank statement through Pluggy (Open Finance), for the period chosen on screen. */
+export async function importPluggy(form: FormData) {
+  const conta = String(form.get("conta"));
+  const { sb, orgId, user, acc } = await accountOf(conta);
+  const finish = String(form.get("finish") || todayInSaoPaulo());
+  const start = String(form.get("start") || finish);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(finish) || start > finish) back(conta, "error", "Período inválido.");
+  let msg = "";
+  try {
+    const r = await syncBankAccount(sb as unknown as ReturnType<typeof supabaseAdmin>, orgId, acc.id, { start, finish, userId: user.id });
+    msg = `${r.inserted} lançamento(s) importado(s) do banco${r.duplicates ? `, ${r.duplicates} já existiam` : ""}.`;
+  } catch (e) {
+    back(conta, "error", e instanceof Error ? e.message : "Falha na importação.");
+  }
+  back(conta, "ok", msg);
 }
 
 export async function reconcile(form: FormData) {

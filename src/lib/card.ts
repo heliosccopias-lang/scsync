@@ -239,3 +239,25 @@ export function pairCardLines(txs: TxForMatch[], expenses: ExpenseForMatch[], mi
 
 /** "2026-11" for a closing date. */
 export const referenceOf = (closing: string) => closing.slice(0, 7);
+
+/**
+ * Card cycle containing `today`: closes on closingDay (this month if not passed yet, else next month)
+ * and is due on dueDay after it. Also the previous cycle, for late postings.
+ */
+export function cardCycles(today: string, closingDay: number, dueDay: number | null) {
+  const [y, m, d] = today.split("-").map(Number);
+  const mk = (yy: number, mm: number, dd: number) => {
+    const t = new Date(Date.UTC(yy, mm - 1, 1));
+    const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dd, last)).padStart(2, "0")}`;
+  };
+  const closingIn = (offset: number) => mk(y, m + offset, closingDay);
+  const off = d <= closingDay ? 0 : 1;
+  const cycle = (o: number) => {
+    const closing = closingIn(o);
+    const from = addDaysISO(closingIn(o - 1), 1);
+    const due = dueDay ? mk(y, m + o + (dueDay > closingDay ? 0 : 1), dueDay) : addDaysISO(closing, 7);
+    return { from, closing, due };
+  };
+  return { current: cycle(off), previous: cycle(off - 1) };
+}

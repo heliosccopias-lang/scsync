@@ -40,6 +40,49 @@ export async function pluggyApiKey(clientId: string, clientSecret: string): Prom
 
 export type PluggyAccount = { id: string; type: string; subtype?: string; name: string; number?: string; marketingName?: string | null };
 
+export async function pluggyAccounts(apiKey: string, itemId: string): Promise<PluggyAccount[]> {
+  const r = await call<{ results: PluggyAccount[] }>(`/accounts?itemId=${encodeURIComponent(itemId)}`, { apiKey });
+  return r.results ?? [];
+}
+
+export type BankLine = { externalId: string; postedOn: string; amountCents: number; description: string; counterpartDoc: string | null; kind: string | null };
+
+type PluggyBankTx = {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type?: "DEBIT" | "CREDIT";
+  paymentData?: { payer?: { documentNumber?: { value?: string } }; receiver?: { documentNumber?: { value?: string } } } | null;
+};
+
+/** Checking/savings account transactions. Signed like our statements: + money in, − money out. */
+export async function pluggyBankLines(apiKey: string, accountId: string, from: string, to: string): Promise<BankLine[]> {
+  const lines: BankLine[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const r = await call<{ results: PluggyBankTx[]; totalPages: number }>(
+      `/transactions?accountId=${encodeURIComponent(accountId)}&from=${from}&to=${to}&pageSize=500&page=${page}`,
+      { apiKey },
+    );
+    for (const t of r.results ?? []) {
+      const abs = Math.abs(Math.round(Number(t.amount) * 100));
+      if (!abs) continue;
+      const cents = t.type === "DEBIT" ? -abs : t.type === "CREDIT" ? abs : Math.round(Number(t.amount) * 100);
+      const other = cents > 0 ? t.paymentData?.payer : t.paymentData?.receiver;
+      lines.push({
+        externalId: `pluggy_${t.id}`,
+        postedOn: String(t.date).slice(0, 10),
+        amountCents: cents,
+        description: t.description || "Lançamento",
+        counterpartDoc: other?.documentNumber?.value?.replace(/\D/g, "") || null,
+        kind: t.type ?? null,
+      });
+    }
+    if (!r.totalPages || page >= r.totalPages) break;
+  }
+  return lines;
+}
+
 export async function pluggyCreditAccounts(apiKey: string, itemId: string): Promise<PluggyAccount[]> {
   const r = await call<{ results: PluggyAccount[] }>(`/accounts?itemId=${encodeURIComponent(itemId)}`, { apiKey });
   return (r.results ?? []).filter((a) => a.type === "CREDIT" || a.subtype === "CREDIT_CARD");

@@ -60,6 +60,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
           {group("Configurações", [
             ["/configuracoes/asaas", "Conexão Asaas"],
             ["/configuracoes/contas", "Contas bancárias"],
+            ["/configuracoes/conexoes", "Conexões bancárias (importação e API)"],
             ["/configuracoes/financeiro", "Juros, categorias e condições"],
             ["/configuracoes/cartoes", "Cartões de crédito"],
             ["/configuracoes/whatsapp", "Robô de WhatsApp"],

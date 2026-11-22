@@ -105,7 +105,8 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
       <div className="spread">
         <h1 style={{ margin: 0 }}>Conciliação de cartão de crédito</h1>
         <span className="muted">
-          <Link href="/configuracoes/cartoes">Cartões</Link> · <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link>
+          <Link href="/configuracoes/cartoes">Cartões</Link> · <Link href="/configuracoes/conexoes">Conexões (API e automático)</Link> ·{" "}
+          <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link>
         </span>
       </div>
       <Notice error={error} ok={ok} />
@@ -130,7 +131,7 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
           </button>
           <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
             {(cards ?? []).some((c) => c.pluggy_account_id)
-              ? "Traz as compras do mês até o fechamento, direto do banco."
+              ? "Traz as compras do mês até o fechamento, direto do banco. Para importar sozinho todo dia, ligue o automático em Conexões."
               : "Nenhum cartão ligado ao Pluggy ainda (Configurações → Cartões de crédito)."}
           </p>
         </form>

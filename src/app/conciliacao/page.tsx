@@ -3,7 +3,7 @@ import { Notice, Shell } from "@/components/Shell";
 import { fmtDate } from "@/lib/format";
 import { formatBRL, todayInSaoPaulo, addMonths } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
-import { expense, importAsaas, importOfx, income, reconcile, reconcileSure, setIgnored, transfer, undo } from "./actions";
+import { expense, importAsaas, importOfx, importPluggy, income, reconcile, reconcileSure, setIgnored, transfer, undo } from "./actions";
 
 type Suggestion = { target_type: string; target_id: string; label: string; amount_cents: number; ref_date: string; score: number };
 
@@ -22,7 +22,7 @@ export default async function ReconciliationPage({
   const { conta, ver = "pendentes", error, ok } = await searchParams;
   const { sb, orgId, orgName } = await requireOrg();
 
-  const { data: accounts } = await sb.from("bank_accounts").select("id, name, kind").eq("org_id", orgId).eq("active", true).order("created_at");
+  const { data: accounts } = await sb.from("bank_accounts").select("id, name, kind, pluggy_account_id, auto_sync, last_synced_at").eq("org_id", orgId).eq("active", true).order("created_at");
   const account = (accounts ?? []).find((a) => a.id === conta) ?? (accounts ?? [])[0];
   if (!account) {
     return (
@@ -118,9 +118,27 @@ export default async function ReconciliationPage({
               <button className="btn btn-primary">Buscar</button>
             </div>
           </form>
-        ) : null}
+        ) : (
+          <form action={importPluggy} className="card">
+            <strong>Buscar extrato pela API (Pluggy)</strong>
+            <p className="muted" style={{ margin: "4px 0 10px" }}>
+              {account.pluggy_account_id
+                ? `Direto do banco, sem baixar arquivo.${account.auto_sync ? " Importação automática diária ligada." : ""}`
+                : "Esta conta ainda não está ligada à API."}{" "}
+              <Link href="/configuracoes/conexoes">Conexões bancárias</Link>
+            </p>
+            <input type="hidden" name="conta" value={account.id} />
+            <div className="row" style={{ flexWrap: "nowrap" }}>
+              <input name="start" type="date" defaultValue={addMonths(today, -1)} aria-label="De" />
+              <input name="finish" type="date" defaultValue={today} aria-label="Até" />
+              <button className="btn btn-primary" disabled={!account.pluggy_account_id}>
+                Buscar
+              </button>
+            </div>
+          </form>
+        )}
         <form action={importOfx} className="card">
-          <strong>Importar extrato OFX</strong>
+          <strong>Importar extrato OFX (manual)</strong>
           <p className="muted" style={{ margin: "4px 0 10px" }}>
             No site do banco, exporte o extrato em OFX (às vezes chamado &ldquo;Money&rdquo;). Lançamentos já importados são ignorados.
           </p>

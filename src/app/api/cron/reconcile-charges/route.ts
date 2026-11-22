@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { asaasFor, syncChargeFromAsaas } from "@/lib/charges";
 import { supabaseAdmin } from "@/lib/supabase";
 import { refreshInvoice } from "@/lib/nfse-db";
+import { syncBankAccount, syncCard } from "@/lib/bank-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -49,5 +50,25 @@ export async function GET(req: Request) {
       results.invoice_error = (results.invoice_error ?? 0) + 1;
     }
   }
-  return NextResponse.json({ checked: open?.length ?? 0, invoices, results });
+  // Bank accounts and cards with automatic import on (Asaas statement / Pluggy).
+  const sync = { banks: 0, cards: 0, errors: 0 };
+  const { data: banks } = await admin.from("bank_accounts").select("id, org_id").eq("auto_sync", true).eq("active", true).limit(500);
+  for (const b of banks ?? []) {
+    try {
+      await syncBankAccount(admin, b.org_id, b.id);
+      sync.banks++;
+    } catch {
+      sync.errors++;
+    }
+  }
+  const { data: cards } = await admin.from("credit_cards").select("id, org_id").eq("auto_sync", true).eq("active", true).limit(500);
+  for (const c of cards ?? []) {
+    try {
+      await syncCard(admin, c.org_id, c.id);
+      sync.cards++;
+    } catch {
+      sync.errors++;
+    }
+  }
+  return NextResponse.json({ checked: open?.length ?? 0, invoices, sync, results });
 }

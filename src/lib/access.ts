@@ -62,6 +62,7 @@ type Rule = { prefix: string; module?: ModuleKey; any?: Perm[]; owner?: boolean 
 const RULES: Rule[] = [
   { prefix: "/conta", owner: true },
   { prefix: "/configuracoes/asaas", owner: true, module: "asaas" },
+  { prefix: "/configuracoes/conexoes", owner: true },
   { prefix: "/configuracoes/cartoes", owner: true, module: "cards" },
   { prefix: "/configuracoes/whatsapp", owner: true, module: "cards" },
   { prefix: "/configuracoes", any: ["settings"] },
