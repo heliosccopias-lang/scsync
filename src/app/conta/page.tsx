@@ -8,7 +8,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { addAccess, confirmSudo, createUser, resetPassword, saveCompany, updateMember } from "./actions";
 
 const MODEL: Record<string, string> = { services: "Só serviços", products: "Só produtos", both: "Serviços e produtos" };
-const STATUS: Record<string, string> = { trial: "Período de teste", active: "Ativa", suspended: "Suspensa", cancelled: "Cancelada" };
+const STATUS: Record<string, string> = { trial: "Período de teste", active: "Ativa", past_due: "Mensalidade em atraso", suspended: "Suspensa", cancelled: "Cancelada" };
 const ROLE_LABEL = Object.fromEntries(ROLES.map((r) => [r.key, r.label]));
 const ENTITY: Record<string, string> = {
   orgs: "Empresa",
@@ -107,6 +107,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <strong>Assinatura:</strong> {STATUS[ctx.account.status] ?? ctx.account.status}
             {ctx.account.status === "trial" && ctx.account.trial_ends_at ? ` até ${fmtDate(ctx.account.trial_ends_at)}` : ""} · plano {ctx.account.plan}
           </div>
+          <a className="btn btn-secondary" href="/conta/assinatura">
+            Ver planos e pagamentos
+          </a>
           <div className="muted">
             {orgs?.length ?? 0} de {ctx.account.max_companies} empresas · {nonOwnerCount} de {ctx.account.max_users} usuários
           </div>

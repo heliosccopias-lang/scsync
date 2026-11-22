@@ -1,13 +1,14 @@
 import { Notice } from "@/components/Shell";
 import { signIn, signUp } from "./actions";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string }> }) {
-  const { error, ok } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string; cadastro?: string }> }) {
+  const { error, ok, cadastro } = await searchParams;
   return (
     <main style={{ maxWidth: 400, paddingTop: 80 }}>
       <h1>
         SC<span style={{ color: "var(--orange-ink)" }}>sync</span>
       </h1>
+      {cadastro ? <p className="muted">Crie sua conta com e-mail e senha para começar o teste grátis de 14 dias.</p> : null}
       <Notice error={error} ok={ok} />
       <form className="card">
         <div className="field">

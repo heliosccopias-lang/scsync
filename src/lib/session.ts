@@ -3,6 +3,8 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseUser } from "./supabase";
 import { denyReason, type AccessCtx } from "./access";
+import { billingBlock, planAllows } from "./plans";
+import { todayInSaoPaulo } from "./money";
 
 export const ORG_COOKIE = "scsync_org";
 
@@ -46,11 +48,16 @@ export const requireOrg = cache(async () => {
 
   const [{ data: permList }, { data: account }, { data: profile }] = await Promise.all([
     sb.rpc("my_perms", { p_org: org.id }),
-    sb.from("accounts").select("id, name, status, plan, trial_ends_at, max_companies, max_users").eq("id", org.account_id).single(),
+    sb.from("accounts").select("id, name, status, plan, billing_cycle, price_cents, trial_ends_at, paid_until, cancel_at_period_end, max_companies, max_users").eq("id", org.account_id).single(),
     sb.from("user_profiles").select("name, must_change_password").eq("user_id", user.id).maybeSingle(),
   ]);
   const perms = new Set<string>((permList as string[] | null) ?? []);
-  const modules = org.modules ?? {};
+  // A module is on when the company turned it on and the plan includes it.
+  const acc = account as { plan: string; status: string } | null;
+  const modules: Record<string, boolean> = {};
+  for (const k of ["os", "stock", "commissions", "finance", "asaas", "bank_reconciliation", "cards"]) {
+    modules[k] = (org.modules ?? {})[k] !== false && planAllows(acc?.plan, acc?.status ?? "trial", k);
+  }
   const ctx = {
     sb,
     user,
@@ -63,7 +70,19 @@ export const requireOrg = cache(async () => {
     can: (p: string) => isOwner || perms.has(p),
     modules,
     module: (k: string) => modules[k] !== false,
-    account: account as { id: string; name: string; status: string; plan: string; trial_ends_at: string | null; max_companies: number; max_users: number },
+    account: account as {
+      id: string;
+      name: string;
+      status: string;
+      plan: string;
+      billing_cycle: string | null;
+      price_cents: number | null;
+      trial_ends_at: string | null;
+      paid_until: string | null;
+      cancel_at_period_end: boolean;
+      max_companies: number;
+      max_users: number;
+    },
     accountId: org.account_id,
     orgs: orgs.map((o) => ({ id: o.id, name: o.name })),
     userName: (profile?.name as string) || user.email || "",
@@ -72,7 +91,7 @@ export const requireOrg = cache(async () => {
   // Central guard (the proxy passes the path). Server actions post to the page they belong to.
   const path = (await headers()).get("x-pathname") ?? "";
   if (profile?.must_change_password && !path.startsWith("/minha-senha")) redirect("/minha-senha?primeiro=1");
-  const blocked = accountBlocked(ctx.account);
+  const blocked = billingBlock(ctx.account, todayInSaoPaulo());
   if (blocked && !["/conta", "/minha-senha", "/sem-acesso"].some((p) => path.startsWith(p))) redirect(`/sem-acesso?motivo=${encodeURIComponent(blocked)}`);
   const why = denyReason(path, ctx satisfies AccessCtx);
   if (why) redirect(`/sem-acesso?motivo=${encodeURIComponent(why)}`);
@@ -80,16 +99,6 @@ export const requireOrg = cache(async () => {
 });
 
 export type Ctx = Awaited<ReturnType<typeof requireOrg>>;
-
-export function accountBlocked(a: { status: string; trial_ends_at: string | null } | null): string | null {
-  if (!a) return null;
-  if (a.status === "suspended") return "A assinatura desta conta está suspensa. Fale com o Dono da conta.";
-  if (a.status === "cancelled") return "Esta conta foi cancelada.";
-  if (a.status === "trial" && a.trial_ends_at && a.trial_ends_at < new Date().toISOString().slice(0, 10)) {
-    return "O período de teste terminou. O Dono da conta pode ativar a assinatura em Conta.";
-  }
-  return null;
-}
 
 /** Server-action guard for one permission. */
 export function requirePerm(ctx: Ctx, perm: string, back: string) {

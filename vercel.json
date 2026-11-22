@@ -1,6 +1,15 @@
 {
-  "regions": ["gru1"],
+  "regions": [
+    "gru1"
+  ],
   "crons": [
-    { "path": "/api/cron/reconcile-charges", "schedule": "0 9 * * *" }
+    {
+      "path": "/api/cron/reconcile-charges",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/billing",
+      "schedule": "30 9 * * *"
+    }
   ]
 }

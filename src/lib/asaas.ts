@@ -36,6 +36,7 @@ export class AsaasError extends Error {
 
 export interface AsaasPayment {
   id: string;
+  subscription?: string | null;
   customer: string;
   value: number;
   netValue?: number;
@@ -134,6 +135,31 @@ export class AsaasClient {
       "GET",
       `/payments/${encodeURIComponent(id)}/pixQrCode`,
     );
+  }
+
+  createSubscription(input: {
+    customer: string;
+    billingType: BillingType;
+    value: number;
+    nextDueDate: string;
+    cycle: "MONTHLY" | "YEARLY";
+    description?: string;
+    externalReference?: string;
+  }) {
+    return this.request<{ id: string; status: string; nextDueDate: string }>("POST", "/subscriptions", input);
+  }
+
+  /** Changes apply to future charges; updatePendingPayments also fixes the open ones. */
+  updateSubscription(id: string, input: { value?: number; cycle?: "MONTHLY" | "YEARLY"; description?: string; nextDueDate?: string; updatePendingPayments?: boolean }) {
+    return this.request<{ id: string; status: string; nextDueDate: string }>("PUT", `/subscriptions/${encodeURIComponent(id)}`, input);
+  }
+
+  subscriptionPayments(id: string) {
+    return this.request<{ data: AsaasPayment[] }>("GET", `/subscriptions/${encodeURIComponent(id)}/payments`);
+  }
+
+  deleteSubscription(id: string) {
+    return this.request<{ deleted: boolean }>("DELETE", `/subscriptions/${encodeURIComponent(id)}`);
   }
 
   createWebhook(input: { name: string; url: string; email: string; authToken: string }) {

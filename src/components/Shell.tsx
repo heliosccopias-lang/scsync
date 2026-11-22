@@ -3,6 +3,7 @@ import { signOut } from "@/app/login/actions";
 import { MenuCloser } from "./MenuCloser";
 import { requireOrg } from "@/lib/session";
 import { canOpen } from "@/lib/access";
+import { GRACE_DAYS } from "@/lib/plans";
 import { switchOrg } from "@/app/empresa/actions";
 
 /** Top bar: menu filtered by the user's profile and the company's modules, company switcher, account links. */
@@ -88,13 +89,24 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
           </div>
         </details>
       </header>
+      {ctx.account?.status === "past_due" ? (
+        <div className="notice notice-error" style={{ margin: 0, borderRadius: 0, textAlign: "center" }}>
+          A mensalidade do SCsync está em atraso; o acesso é bloqueado {GRACE_DAYS} dias após o vencimento.
+          {ctx.isOwner ? (
+            <>
+              {" "}
+              <Link href="/conta/assinatura">Pagar agora</Link>
+            </>
+          ) : null}
+        </div>
+      ) : null}
       {trialDays !== null && trialDays >= 0 ? (
         <div className="notice" style={{ margin: 0, borderRadius: 0, textAlign: "center", background: "var(--orange-soft)", color: "var(--orange-ink)" }}>
           Período de teste: {trialDays === 0 ? "termina hoje" : `${trialDays} dia(s) restante(s)`}.
           {ctx.isOwner ? (
             <>
               {" "}
-              <Link href="/conta">Ativar assinatura</Link>
+              <Link href="/conta/assinatura">Escolher plano</Link>
             </>
           ) : null}
         </div>
