@@ -63,6 +63,7 @@ const RULES: Rule[] = [
   { prefix: "/conta", owner: true },
   { prefix: "/configuracoes/asaas", owner: true, module: "asaas" },
   { prefix: "/configuracoes/conexoes", owner: true },
+  { prefix: "/configuracoes/maquininhas", owner: true },
   { prefix: "/configuracoes/cartoes", owner: true, module: "cards" },
   { prefix: "/configuracoes/whatsapp", owner: true, module: "cards" },
   { prefix: "/configuracoes", any: ["settings"] },

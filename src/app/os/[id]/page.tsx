@@ -12,6 +12,7 @@ import { ATTENDANCE_LABEL, fmtDate as fmtDay } from "@/lib/format";
 import { listAttachments, fmtSize } from "@/lib/attachments";
 import { Uploader } from "@/components/Uploader";
 import { InvoiceRows } from "@/app/notas/InvoiceRows";
+import { cancelTerminal, checkTerminal, sendToTerminal } from "./pos-actions";
 import { PrintSpecFields } from "@/components/PrintSpecFields";
 import { registerOsFiles } from "./files-actions";
 import { stockAction, addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
@@ -51,6 +52,13 @@ export default async function ServiceOrderPage({
   const { error, ok } = await searchParams;
   const { sb, orgId, orgName, module: hasModule, can } = await requireOrg();
   const showNfse = hasModule("nfse") && (can("fiscal.issue") || can("finance.view"));
+  const canReceive = can("finance.receive");
+  const [{ data: terminals }, { data: posCharges }] = canReceive
+    ? await Promise.all([
+        sb.from("pos_terminals").select("id, name, provider").eq("org_id", orgId).eq("active", true).eq("provider", "stone").order("name"),
+        sb.from("pos_charges").select("id, receivable_id, status, amount_cents, payment_type, installments, created_at, error, terminal_id").eq("service_order_id", id).order("created_at", { ascending: false }).limit(20),
+      ])
+    : [{ data: [] as { id: string; name: string; provider: string }[] }, { data: [] as Record<string, unknown>[] }];
   const { data: invoices } = showNfse
     ? await sb
         .from("service_invoices")
@@ -652,6 +660,80 @@ export default async function ServiceOrderPage({
                       Abaixo de {formatBRL(ASAAS_MIN_CHARGE_CENTS)} o Asaas não gera cobrança: receba na maquininha ou em dinheiro.
                     </span>
                   ) : null}
+                  {(() => {
+                    const pending = (posCharges ?? []).find((p) => p.receivable_id === r.id && p.status === "pending") as
+                      | { id: string; amount_cents: number; payment_type: string; installments: number }
+                      | undefined;
+                    if (pending) {
+                      return (
+                        <div className="card" style={{ flexBasis: "100%", borderColor: "var(--orange)" }}>
+                          <strong>Aguardando pagamento na maquininha Stone: {formatBRL(Number(pending.amount_cents))}</strong>
+                          <span className="muted">
+                            {" "}
+                            ·{" "}
+                            {pending.payment_type === "credit"
+                              ? `crédito ${pending.installments}x`
+                              : pending.payment_type === "debit"
+                                ? "débito"
+                                : "forma escolhida na maquininha"}
+                          </span>
+                          <div className="row" style={{ marginTop: 8 }}>
+                            <form action={checkTerminal}>
+                              <input type="hidden" name="id" value={id} />
+                              <input type="hidden" name="charge_id" value={pending.id} />
+                              <button className="btn btn-primary">Já pagou? Conferir</button>
+                            </form>
+                            <form action={cancelTerminal}>
+                              <input type="hidden" name="id" value={id} />
+                              <input type="hidden" name="charge_id" value={pending.id} />
+                              <button className="btn btn-secondary">Tirar da maquininha</button>
+                            </form>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (!canReceive || !(terminals ?? []).length) return null;
+                    return (
+                      <details style={{ minWidth: 260 }}>
+                        <summary className="btn btn-primary" style={{ display: "inline-flex" }}>
+                          Cobrar na maquininha Stone
+                        </summary>
+                        <form action={sendToTerminal} className="card" style={{ marginTop: 10 }}>
+                          <input type="hidden" name="id" value={id} />
+                          <input type="hidden" name="receivable_id" value={r.id} />
+                          <div className="grid2">
+                            <div className="field">
+                              <label>Maquininha</label>
+                              <select name="terminal_id">
+                                {(terminals ?? []).map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label>Valor (R$)</label>
+                              <input name="amount" inputMode="decimal" defaultValue={(r.open_cents / 100).toFixed(2).replace(".", ",")} />
+                            </div>
+                            <div className="field">
+                              <label>Forma</label>
+                              <select name="payment_type" defaultValue="any">
+                                <option value="any">Cliente escolhe na maquininha (débito, crédito, Pix)</option>
+                                <option value="debit">Débito</option>
+                                <option value="credit">Crédito</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label>Parcelas (crédito)</label>
+                              <input name="installments" type="number" min={1} max={18} defaultValue={1} />
+                            </div>
+                          </div>
+                          <button className="btn btn-primary">Enviar para a maquininha</button>
+                        </form>
+                      </details>
+                    );
+                  })()}
                   <details style={{ flex: 1, minWidth: 280 }}>
                     <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>
                       Receber na maquininha / dinheiro
@@ -718,7 +800,7 @@ export default async function ServiceOrderPage({
                           {s.card_installments && s.card_installments > 1 ? ` ${s.card_installments}x` : ""}
                           {s.reference ? <span className="muted"> · NSU {s.reference}</span> : null}
                         </td>
-                        <td>{s.source === "asaas_webhook" ? "Asaas (automático)" : "Manual"}</td>
+                        <td>{s.source === "asaas_webhook" ? "Asaas (automático)" : s.source === "pos_terminal" ? "Maquininha Stone (automático)" : "Manual"}</td>
                         <td className="num">
                           {formatBRL(s.amount_cents)}
                           {s.interest_cents > 0 ? <span className="muted"> + juros {formatBRL(s.interest_cents)}</span> : null}

@@ -3,6 +3,7 @@ import { asaasFor, syncChargeFromAsaas } from "@/lib/charges";
 import { supabaseAdmin } from "@/lib/supabase";
 import { refreshInvoice } from "@/lib/nfse-db";
 import { syncBankAccount, syncCard } from "@/lib/bank-sync";
+import { syncStoneCharge } from "@/lib/pos-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -70,5 +71,22 @@ export async function GET(req: Request) {
       sync.errors++;
     }
   }
-  return NextResponse.json({ checked: open?.length ?? 0, invoices, sync, results });
+  // Terminal charges still waiting (lost webhook): read again from Stone.
+  const { data: pos } = await admin
+    .from("pos_charges")
+    .select("id, org_id")
+    .eq("status", "pending")
+    .eq("provider", "stone")
+    .gte("created_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
+    .limit(500);
+  let posSynced = 0;
+  for (const p of pos ?? []) {
+    try {
+      await syncStoneCharge(p.org_id, p.id);
+      posSynced++;
+    } catch {
+      /* next run */
+    }
+  }
+  return NextResponse.json({ checked: open?.length ?? 0, invoices, sync, pos: posSynced, results });
 }

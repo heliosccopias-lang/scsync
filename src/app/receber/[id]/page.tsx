@@ -221,7 +221,7 @@ export default async function ReceivableDetail({ params, searchParams }: { param
                     {METHOD_LABEL[s.method] ?? s.method}
                     {s.reference ? <span className="muted"> · NSU {s.reference}</span> : null}
                   </td>
-                  <td>{{ asaas_webhook: "Asaas (automático)", manual: "Manual", batch: "Baixa em lote", reconciliation: "Conciliação" }[s.source as string] ?? s.source}</td>
+                  <td>{{ asaas_webhook: "Asaas (automático)", manual: "Manual", batch: "Baixa em lote", reconciliation: "Conciliação", pos_terminal: "Maquininha (automático)" }[s.source as string] ?? s.source}</td>
                   <td className="num">
                     {formatBRL(s.amount_cents)}
                     {s.interest_cents > 0 ? <span className="muted"> + juros {formatBRL(s.interest_cents)}</span> : null}
