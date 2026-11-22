@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { Notice, Shell } from "@/components/Shell";
 import { CopyButton } from "@/components/CopyButton";
 import { requireOrg } from "@/lib/session";
-import { encryptSecret, newWebhookToken, sha256 } from "@/lib/crypto";
+import { decryptSecret, encryptSecret, newWebhookToken, sha256 } from "@/lib/crypto";
+import { MpClient, MpError, type MpTerminal } from "@/lib/mercadopago";
 
 const PATH = "/configuracoes/maquininhas";
 function back(key: "error" | "ok", msg: string, extra = ""): never {
@@ -34,6 +35,52 @@ async function saveStone(form: FormData) {
   back("ok", "Stone conectada. Agora cadastre o webhook no painel da Pagar.me com o endereço abaixo.", `&url=${encodeURIComponent(url.toString())}`);
 }
 
+function hookUrl(path: string, token: string): string {
+  const url = new URL(path, process.env.APP_URL);
+  url.searchParams.set("token", token);
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (bypass) url.searchParams.set("x-vercel-protection-bypass", bypass);
+  return url.toString();
+}
+
+async function saveMercadoPago(form: FormData) {
+  "use server";
+  const ctx = await owner();
+  const token = String(form.get("access_token") ?? "").trim();
+  if (!/^(APP_USR|TEST)-[\w-]+$/.test(token)) back("error", "O Access Token do Mercado Pago começa com APP_USR- (Suas integrações → sua aplicação → Credenciais).");
+  if (!process.env.APP_URL) back("error", "APP_URL não está configurada no servidor.");
+  try {
+    await new MpClient(token).listTerminals();
+  } catch (e) {
+    back("error", e instanceof MpError && e.status === 401 ? "O Mercado Pago recusou esse Access Token." : `Não foi possível validar: ${e instanceof Error ? e.message : "erro"}`);
+  }
+  const hook = newWebhookToken();
+  await ctx.sb.from("orgs").update({ mp_access_token_encrypted: encryptSecret(token), mp_webhook_token_hash: sha256(hook) }).eq("id", ctx.orgId);
+  back(
+    "ok",
+    "Mercado Pago conectado. Cadastre o webhook abaixo e adicione as maquininhas Point.",
+    `&url=${encodeURIComponent(hookUrl(`/api/webhooks/mercadopago/${ctx.orgId}`, hook))}&p=mp`,
+  );
+}
+
+/** Adds a Point terminal found on the account and switches it to PDV mode (orders from the system). */
+async function addMpTerminal(form: FormData) {
+  "use server";
+  const ctx = await owner();
+  const { data: org } = await ctx.sb.from("orgs").select("mp_access_token_encrypted").eq("id", ctx.orgId).single();
+  if (!org?.mp_access_token_encrypted) back("error", "Conecte o Mercado Pago primeiro.");
+  const id = String(form.get("terminal_id") ?? "");
+  const name = String(form.get("name") ?? "").trim().slice(0, 60) || "Point";
+  try {
+    await new MpClient(decryptSecret(org.mp_access_token_encrypted)).setPdvMode(id);
+  } catch (e) {
+    back("error", `O Mercado Pago não mudou a maquininha para o modo PDV: ${e instanceof Error ? e.message : "erro"}`);
+  }
+  const { error } = await ctx.sb.from("pos_terminals").insert({ org_id: ctx.orgId, provider: "mercadopago", name, serial_number: id });
+  if (error) back("error", error.code === "23505" ? "Essa maquininha já está cadastrada." : "Não foi possível salvar.");
+  back("ok", "Maquininha Point cadastrada em modo PDV. Reinicie a maquininha para valer.");
+}
+
 async function saveTerminal(form: FormData) {
   "use server";
   const ctx = await owner();
@@ -54,15 +101,26 @@ async function toggleTerminal(form: FormData) {
   back("ok", active ? "Maquininha desativada." : "Maquininha ativada.");
 }
 
-export default async function TerminalsPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string; url?: string }> }) {
-  const { error, ok, url } = await searchParams;
+export default async function TerminalsPage({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string; url?: string; p?: string }> }) {
+  const { error, ok, url, p } = await searchParams;
   const ctx = await requireOrg();
   const [{ data: org }, { data: terminals }] = await Promise.all([
-    ctx.sb.from("orgs").select("stone_secret_key_encrypted").eq("id", ctx.orgId).single(),
+    ctx.sb.from("orgs").select("stone_secret_key_encrypted, mp_access_token_encrypted").eq("id", ctx.orgId).single(),
     ctx.sb.from("pos_terminals").select("*").eq("org_id", ctx.orgId).order("provider").order("name"),
   ]);
   const stoneOn = !!org?.stone_secret_key_encrypted;
   const partnerOn = !!process.env.STONE_SERVICE_REFERER_NAME;
+  const mpOn = !!org?.mp_access_token_encrypted;
+  let mpTerminals: MpTerminal[] = [];
+  let mpError: string | null = null;
+  if (mpOn) {
+    try {
+      mpTerminals = (await new MpClient(decryptSecret(org!.mp_access_token_encrypted!)).listTerminals()).data?.terminals ?? [];
+    } catch (e) {
+      mpError = e instanceof Error ? e.message : "erro";
+    }
+  }
+  const registered = new Set((terminals ?? []).filter((t) => t.provider === "mercadopago").map((t) => t.serial_number));
 
   return (
     <Shell>
@@ -83,7 +141,7 @@ export default async function TerminalsPage({ searchParams }: { searchParams: Pr
             de cobrança não envia para a maquininha.
           </div>
         ) : null}
-        {url ? (
+        {url && p !== "mp" ? (
           <div className="notice notice-ok" style={{ wordBreak: "break-all" }}>
             <strong>Endereço do webhook (cole no painel da Pagar.me; só aparece agora):</strong>
             <div style={{ margin: "6px 0" }}>{url}</div>
@@ -105,6 +163,58 @@ export default async function TerminalsPage({ searchParams }: { searchParams: Pr
       </section>
 
       <section className="card" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>
+          Mercado Pago Point {mpOn ? <span className="pill pill-paid">conectado</span> : <span className="pill pill-neutral">não conectado</span>}
+        </h2>
+        {url && p === "mp" ? (
+          <div className="notice notice-ok" style={{ wordBreak: "break-all" }}>
+            <strong>Endereço do webhook (só aparece agora):</strong>
+            <div style={{ margin: "6px 0" }}>{url}</div>
+            <CopyButton text={url} label="Copiar endereço" />
+            <div style={{ marginTop: 6, fontSize: 13 }}>
+              Mercado Pago Developers → Suas integrações → sua aplicação → Webhooks → Configurar notificações → Modo de produção: cole o endereço e marque o
+              evento <strong>Order (Mercado Pago)</strong>.
+            </div>
+          </div>
+        ) : null}
+        <ol className="muted" style={{ fontSize: 14 }}>
+          <li>Em mercadopago.com.br/developers, crie uma aplicação (Suas integrações) e copie o <strong>Access Token</strong> de produção (APP_USR-...).</li>
+          <li>Cole abaixo: o sistema confere a chave e gera o endereço do webhook para colar na aplicação.</li>
+          <li>As maquininhas Point Smart da conta aparecem abaixo: clique em Adicionar (ela passa para o modo PDV) e reinicie a maquininha.</li>
+        </ol>
+        <form action={saveMercadoPago} className="row">
+          <input name="access_token" type="password" placeholder="APP_USR-..." autoComplete="off" style={{ width: 360 }} />
+          <button className="btn btn-primary">{mpOn ? "Trocar token e gerar novo webhook" : "Conectar Mercado Pago"}</button>
+        </form>
+        {mpError ? <div className="notice notice-error" style={{ marginTop: 10 }}>Mercado Pago: {mpError}</div> : null}
+        {mpOn && mpTerminals.length ? (
+          <table style={{ marginTop: 12 }}>
+            <tbody>
+              {mpTerminals.map((t) => (
+                <tr key={t.id}>
+                  <td>{t.id}</td>
+                  <td>Modo: {t.operating_mode ?? "—"}</td>
+                  <td className="num">
+                    {registered.has(t.id) ? (
+                      <span className="muted">cadastrada</span>
+                    ) : (
+                      <form action={addMpTerminal} className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
+                        <input type="hidden" name="terminal_id" value={t.id} />
+                        <input name="name" placeholder="Nome (ex.: Balcão)" style={{ width: 160 }} />
+                        <button className="btn btn-secondary">Adicionar</button>
+                      </form>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : mpOn && !mpError ? (
+          <p className="muted">Nenhuma maquininha Point encontrada nesta conta do Mercado Pago.</p>
+        ) : null}
+      </section>
+
+      <section className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>PagBank (Moderninha)</h2>
         <p style={{ marginTop: 0 }}>
           A PagBank não oferece envio de cobrança da nuvem direto para a Moderninha: a cobrança integrada exige um aplicativo instalado na própria maquininha
@@ -121,7 +231,7 @@ export default async function TerminalsPage({ searchParams }: { searchParams: Pr
             <tbody>
               {(terminals ?? []).map((t) => (
                 <tr key={t.id} style={{ opacity: t.active ? 1 : 0.55 }}>
-                  <td>{t.provider === "stone" ? "Stone" : "PagBank"}</td>
+                  <td>{{ stone: "Stone", pagbank: "PagBank", mercadopago: "Mercado Pago" }[t.provider as string] ?? t.provider}</td>
                   <td>{t.name}</td>
                   <td>Série {t.serial_number}</td>
                   <td className="num">

@@ -73,7 +73,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
             ["/configuracoes/asaas", "Conexão Asaas"],
             ["/configuracoes/contas", "Contas bancárias"],
             ["/configuracoes/conexoes", "Conexões bancárias (importação e API)"],
-            ["/configuracoes/maquininhas", "Maquininhas (Stone e PagBank)"],
+            ["/configuracoes/maquininhas", "Maquininhas (Stone, Mercado Pago, PagBank)"],
             ["/configuracoes/financeiro", "Juros, categorias e condições"],
             ["/configuracoes/cartoes", "Cartões de crédito"],
             ["/configuracoes/whatsapp", "Robô de WhatsApp"],

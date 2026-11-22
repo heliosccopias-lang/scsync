@@ -55,8 +55,8 @@ export default async function ServiceOrderPage({
   const canReceive = can("finance.receive");
   const [{ data: terminals }, { data: posCharges }] = canReceive
     ? await Promise.all([
-        sb.from("pos_terminals").select("id, name, provider").eq("org_id", orgId).eq("active", true).eq("provider", "stone").order("name"),
-        sb.from("pos_charges").select("id, receivable_id, status, amount_cents, payment_type, installments, created_at, error, terminal_id").eq("service_order_id", id).order("created_at", { ascending: false }).limit(20),
+        sb.from("pos_terminals").select("id, name, provider").eq("org_id", orgId).eq("active", true).in("provider", ["stone", "mercadopago"]).order("name"),
+        sb.from("pos_charges").select("id, receivable_id, status, amount_cents, payment_type, installments, created_at, error, terminal_id, provider").eq("service_order_id", id).order("created_at", { ascending: false }).limit(20),
       ])
     : [{ data: [] as { id: string; name: string; provider: string }[] }, { data: [] as Record<string, unknown>[] }];
   const { data: invoices } = showNfse
@@ -662,12 +662,14 @@ export default async function ServiceOrderPage({
                   ) : null}
                   {(() => {
                     const pending = (posCharges ?? []).find((p) => p.receivable_id === r.id && p.status === "pending") as
-                      | { id: string; amount_cents: number; payment_type: string; installments: number }
+                      | { id: string; amount_cents: number; payment_type: string; installments: number; provider: string }
                       | undefined;
                     if (pending) {
                       return (
                         <div className="card" style={{ flexBasis: "100%", borderColor: "var(--orange)" }}>
-                          <strong>Aguardando pagamento na maquininha Stone: {formatBRL(Number(pending.amount_cents))}</strong>
+                          <strong>
+                            Aguardando pagamento na maquininha {pending.provider === "mercadopago" ? "Mercado Pago" : "Stone"}: {formatBRL(Number(pending.amount_cents))}
+                          </strong>
                           <span className="muted">
                             {" "}
                             ·{" "}
@@ -696,7 +698,7 @@ export default async function ServiceOrderPage({
                     return (
                       <details style={{ minWidth: 260 }}>
                         <summary className="btn btn-primary" style={{ display: "inline-flex" }}>
-                          Cobrar na maquininha Stone
+                          Cobrar na maquininha
                         </summary>
                         <form action={sendToTerminal} className="card" style={{ marginTop: 10 }}>
                           <input type="hidden" name="id" value={id} />
@@ -707,7 +709,7 @@ export default async function ServiceOrderPage({
                               <select name="terminal_id">
                                 {(terminals ?? []).map((t) => (
                                   <option key={t.id} value={t.id}>
-                                    {t.name}
+                                    {t.name} ({t.provider === "mercadopago" ? "Mercado Pago" : "Stone"})
                                   </option>
                                 ))}
                               </select>
@@ -800,7 +802,7 @@ export default async function ServiceOrderPage({
                           {s.card_installments && s.card_installments > 1 ? ` ${s.card_installments}x` : ""}
                           {s.reference ? <span className="muted"> · NSU {s.reference}</span> : null}
                         </td>
-                        <td>{s.source === "asaas_webhook" ? "Asaas (automático)" : s.source === "pos_terminal" ? "Maquininha Stone (automático)" : "Manual"}</td>
+                        <td>{s.source === "asaas_webhook" ? "Asaas (automático)" : s.source === "pos_terminal" ? "Maquininha (automático)" : "Manual"}</td>
                         <td className="num">
                           {formatBRL(s.amount_cents)}
                           {s.interest_cents > 0 ? <span className="muted"> + juros {formatBRL(s.interest_cents)}</span> : null}
