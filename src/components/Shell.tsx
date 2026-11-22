@@ -141,7 +141,7 @@ const OS_STATUS: Record<string, string> = {
   open: "Aberta",
   approved: "Aprovada",
   in_progress: "Em execução",
-  waiting_parts: "Aguardando peças",
+  waiting_parts: "Aguardando material",
   done: "Concluída",
   delivered: "Entregue",
   cancelled: "Cancelada",
