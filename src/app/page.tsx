@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 const FEATURES: [string, string][] = [
+  ["Nota fiscal de serviço", "No plano Completo, emita a NFS-e direto da OS ou avulsa, com PDF e XML, ou deixe sair sozinha quando o cliente pagar."],
   ["Ordem de serviço de gráfica", "Formato, papel, cores, acabamento e arte aprovada na OS. Via do cliente, ordem de produção e recibo prontos para imprimir em A4."],
   ["Cobrança por Pix, boleto e cartão", "Gere o Pix da OS e mande pelo WhatsApp. A baixa é automática quando o cliente paga, pelo Asaas."],
   ["Conciliação bancária", "Importe o extrato OFX e o sistema casa cada entrada e saída com as contas a receber e a pagar."],
@@ -112,7 +113,7 @@ function Landing() {
               </div>
             ))}
           </div>
-          <p className="lp-fine">Valores por conta, já com todas as atualizações. A emissão de nota fiscal do plano Completo depende do cadastro fiscal da empresa.</p>
+          <p className="lp-fine">Valores por conta, já com todas as atualizações. O plano Completo emite nota fiscal de serviço (NFS-e) pela conta Asaas da gráfica; precisa do CNPJ e do cadastro fiscal na prefeitura. Nota de produto (NF-e) não está incluída.</p>
         </div>
       </section>
 
