@@ -2,7 +2,7 @@
 
 import { useActionState, useState, type FormEvent } from "react";
 import { createSale, type SaleState } from "./actions";
-import { SALE_LINES } from "./constants";
+import { SALE_LINES, SALE_START_LINES } from "./constants";
 import type { CatalogEntry } from "@/app/os/nova/NewOrderForm";
 import { parseQuantity } from "@/lib/money";
 
@@ -36,6 +36,9 @@ export function CounterSaleForm({
   const [lineTotals, setLineTotals] = useState<number[]>(() => Array(SALE_LINES).fill(0));
   const [method, setMethod] = useState(v.method ?? (canReceive ? "cash" : "later"));
   const [condition, setCondition] = useState(v.condition_id ?? "");
+  // Visible item lines: 4 to start, more on demand (and enough to show what came back from a failed save).
+  const filled = Array.from({ length: SALE_LINES }, (_, i) => i).filter((i) => v[`item_desc_${i}`] || v[`item_qty_${i}`] || v[`item_price_${i}`]);
+  const [lines, setLines] = useState(Math.max(SALE_START_LINES, filled.length ? filled[filled.length - 1] + 1 : 0));
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
 
   function onInput(e: FormEvent<HTMLFormElement>) {
@@ -52,17 +55,17 @@ export function CounterSaleForm({
       if (hit && qty && !qty.value) qty.value = "1";
     }
     let sum = 0;
-    const lines: number[] = [];
+    const perLine: number[] = [];
     for (let i = 0; i < SALE_LINES; i++) {
       const q = (form.elements.namedItem(`item_qty_${i}`) as HTMLInputElement | null)?.value ?? "";
       const p = (form.elements.namedItem(`item_price_${i}`) as HTMLInputElement | null)?.value ?? "";
       // Quantity like the server reads it (2,5 or 2.5); price in Brazilian format (1.250,00).
       const qty = parseQuantity(q) ?? 0;
       const line = p ? Math.round(qty * num(p) * 100) : 0;
-      lines.push(line);
+      perLine.push(line);
       sum += line;
     }
-    setLineTotals(lines);
+    setLineTotals(perLine);
     const d = (form.elements.namedItem("discount") as HTMLInputElement | null)?.value ?? "";
     setTotal(Math.max(0, sum - Math.round(num(d) * 100)));
   }
@@ -141,7 +144,7 @@ export function CounterSaleForm({
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: SALE_LINES }, (_, i) => (
+            {Array.from({ length: lines }, (_, i) => (
               <tr key={i}>
                 <td>
                   <input
@@ -168,6 +171,11 @@ export function CounterSaleForm({
             ))}
           </tbody>
         </table>
+        {lines < SALE_LINES ? (
+          <button type="button" className="btn btn-secondary" style={{ marginTop: 8, padding: "4px 12px", fontSize: 13 }} onClick={() => setLines((n) => Math.min(SALE_LINES, n + 1))}>
+            + Adicionar linha
+          </button>
+        ) : null}
         <div className="row" style={{ marginTop: 10, alignItems: "flex-end" }}>
           <div className="field" style={{ width: 160, marginBottom: 0 }}>
             <label htmlFor="discount">Desconto (R$)</label>
