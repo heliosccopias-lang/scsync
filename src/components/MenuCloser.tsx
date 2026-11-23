@@ -28,11 +28,43 @@ export function MenuCloser() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") for (const m of menus()) m.open = false;
     };
+    // Floating forms (details.popover): pinned to the viewport next to their button, so a table
+    // (overflow: hidden) or the bar below never covers them; open upwards when there is no room below.
+    const place = (d: HTMLDetailsElement) => {
+      const panel = d.querySelector<HTMLElement>(":scope > .popover-panel");
+      const btn = d.querySelector<HTMLElement>(":scope > summary");
+      if (!panel || !btn) return;
+      const r = btn.getBoundingClientRect();
+      panel.style.position = "fixed";
+      panel.style.zIndex = "60";
+      panel.style.margin = "0";
+      panel.style.maxHeight = `${window.innerHeight - 16}px`;
+      panel.style.overflowY = "auto";
+      const w = panel.offsetWidth;
+      const h = panel.offsetHeight;
+      const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+      const below = r.bottom + 4;
+      const top = below + h <= window.innerHeight - 8 ? below : Math.max(8, r.top - h - 4);
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+      panel.style.right = "auto";
+    };
+    const placeAll = () => document.querySelectorAll<HTMLDetailsElement>("details.popover[open]").forEach(place);
+    const onToggle = (e: Event) => {
+      const d = e.target as HTMLElement;
+      if (d instanceof HTMLDetailsElement && d.classList.contains("popover") && d.open) place(d);
+    };
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKey);
+    document.addEventListener("toggle", onToggle, true);
+    window.addEventListener("scroll", placeAll, true);
+    window.addEventListener("resize", placeAll);
     return () => {
       document.removeEventListener("click", onClick);
       document.removeEventListener("keydown", onKey);
+      document.removeEventListener("toggle", onToggle, true);
+      window.removeEventListener("scroll", placeAll, true);
+      window.removeEventListener("resize", placeAll);
     };
   }, []);
   return null;
