@@ -67,7 +67,7 @@ const RULES: Rule[] = [
   { prefix: "/configuracoes/cartoes", owner: true, module: "cards" },
   { prefix: "/configuracoes/whatsapp", owner: true, module: "cards" },
   { prefix: "/configuracoes", any: ["settings"] },
-  { prefix: "/cadastros/tecnicos", module: "os", any: ["settings"] },
+  { prefix: "/cadastros/tecnicos", any: ["settings"] },
   { prefix: "/cadastros/checklists", module: "os", any: ["settings", "os.edit"] },
   { prefix: "/cadastros/itens", any: ["catalog.edit", "os.view"] },
   { prefix: "/cadastros/clientes", any: ["customers.edit", "os.view", "finance.view"] },

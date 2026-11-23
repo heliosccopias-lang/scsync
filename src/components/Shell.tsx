@@ -68,7 +68,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
           {group("Cadastros", [
             ["/cadastros/clientes", "Clientes"],
             ["/cadastros/itens", "Serviços e produtos"],
-            ["/cadastros/tecnicos", "Técnicos"],
+            ["/cadastros/tecnicos", "Técnicos e atendentes"],
             ["/cadastros/checklists", "Checklists"],
           ])}
           {group("Configurações", [

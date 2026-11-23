@@ -16,10 +16,16 @@ export function CounterSaleForm({
   catalog,
   customers,
   canReceive,
+  attendants,
+  defaultAttendant,
+  canManageAttendants,
 }: {
   catalog: CatalogEntry[];
   customers: { id: string; name: string }[];
   canReceive: boolean;
+  attendants: { id: string; name: string }[];
+  defaultAttendant: string;
+  canManageAttendants: boolean;
 }) {
   const [state, action, pending] = useActionState<SaleState, FormData>(createSale, {});
   const v = state.values ?? {};
@@ -71,16 +77,47 @@ export function CounterSaleForm({
       ) : null}
 
       <div className="card" style={{ marginBottom: 12 }}>
-        <div className="field" style={{ maxWidth: 420 }}>
-          <label htmlFor="customer_id">Cliente (opcional)</label>
-          <select id="customer_id" name="customer_id" defaultValue={v.customer_id ?? ""}>
-            <option value="">Consumidor final</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+        <div className="row" style={{ alignItems: "flex-end", gap: 12 }}>
+          <div className="field" style={{ flex: 1, minWidth: 240, maxWidth: 420 }}>
+            <label htmlFor="customer_id">Cliente (opcional)</label>
+            <select id="customer_id" name="customer_id" defaultValue={v.customer_id ?? ""}>
+              <option value="">Consumidor final</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field attendant-field" style={{ flex: 1, minWidth: 240, maxWidth: 360 }}>
+            <label htmlFor="technician_id">
+              <span className="attendant-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.4 0-8 2.3-8 5.2V21h16v-1.8c0-2.9-3.6-5.2-8-5.2Z" />
+                </svg>
+              </span>
+              Atendente / técnico
+            </label>
+            <select id="technician_id" name="technician_id" defaultValue={v.technician_id ?? defaultAttendant} {...bad("technician_id")}>
+              <option value="">— Não informado —</option>
+              {attendants.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            {!attendants.length ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                {canManageAttendants ? (
+                  <>
+                    Cadastre a equipe em <a href="/cadastros/tecnicos">Cadastros → Técnicos</a>.
+                  </>
+                ) : (
+                  "Peça ao administrador para cadastrar a equipe em Cadastros → Técnicos."
+                )}
+              </span>
+            ) : null}
+          </div>
         </div>
         <table className="sale-table">
           <colgroup>

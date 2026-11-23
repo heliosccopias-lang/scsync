@@ -14,6 +14,7 @@ const ERRORS: Record<string, string> = {
   total_not_positive: "O total da venda precisa ser maior que zero.",
   bank_account_required: "Cadastre uma conta bancária ou caixa em Configurações → Contas bancárias.",
   invalid_method: "Escolha a forma de pagamento.",
+  invalid_technician: "Escolha um atendente desta empresa.",
 };
 
 /** Counter sale: one screen, paid on the spot or charged right after (Pix/maquininha on the sale's page). */
@@ -47,6 +48,7 @@ export async function createSale(_prev: SaleState, form: FormData): Promise<Sale
     p_org: ctx.orgId,
     p: {
       customer_id: values.customer_id || null,
+      technician_id: values.technician_id || null,
       items,
       discount_cents: discount,
       method: payNow ? how : values.later_method || "pix",
