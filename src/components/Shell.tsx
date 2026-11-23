@@ -37,7 +37,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
       <header className="topbar">
         <Link href="/" className="brand" aria-label="SCsync — início">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/scsync-logo-compact-dark.svg" alt="SCsync" height={54} />
+          <img src="/brand/scsync-logo-compact-dark.svg" alt="SCsync" height={64} />
         </Link>
         {/* Mobile: the menu button toggles the nav (pure CSS, no script). */}
         <input type="checkbox" id="nav-toggle" className="nav-toggle" aria-hidden="true" />

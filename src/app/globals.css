@@ -23,13 +23,13 @@
 html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.5; }
 a { color: var(--orange-ink); }
 
-.topbar { background: var(--ink); color: var(--paper); display: flex; align-items: center; gap: 24px; padding: 0 24px; height: 72px; }
+.topbar { background: var(--ink); color: var(--paper); display: flex; align-items: center; gap: 28px; padding: 0 28px; height: 88px; }
 .topbar .brand { font-weight: 700; letter-spacing: .2px; }
 .topbar .brand span { color: var(--orange); }
-.topbar nav { display: flex; gap: 18px; flex: 1; }
-.topbar nav a { color: #e9e4dc; text-decoration: none; font-size: 14px; }
+.topbar nav { display: flex; gap: 6px 20px; flex: 1; align-items: center; flex-wrap: wrap; }
+.topbar nav a { color: #e9e4dc; text-decoration: none; font-size: 15px; white-space: nowrap; }
 .topbar nav a:hover { color: var(--orange); }
-.topbar .org { color: #b3aea5; font-size: 13px; }
+.topbar .org { color: #b3aea5; font-size: 14px; white-space: nowrap; }
 
 main { max-width: 1080px; margin: 0 auto; padding: 28px 24px 64px; }
 h1 { font-size: 22px; margin: 0 0 20px; }
@@ -74,11 +74,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 code.copy { display: block; word-break: break-all; background: #f6f1ea; padding: 10px; border-radius: 8px; font-size: 12px; }
 
 .topbar .menu { position: relative; }
-.topbar .menu summary { list-style: none; cursor: pointer; color: #e9e4dc; font-size: 14px; }
+.topbar .menu summary { list-style: none; cursor: pointer; color: #e9e4dc; font-size: 15px; white-space: nowrap; }
 .topbar .menu summary::-webkit-details-marker { display: none; }
 .topbar .menu summary::after { content: " ▾"; font-size: 10px; }
 .topbar .menu[open] summary, .topbar .menu summary:hover { color: var(--orange); }
-.topbar .menu-list { position: absolute; top: 30px; left: -12px; z-index: 20; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.12); padding: 6px; min-width: 210px; display: flex; flex-direction: column; }
+.topbar .menu-list { position: absolute; top: 38px; left: -12px; z-index: 20; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.12); padding: 6px; min-width: 210px; display: flex; flex-direction: column; }
 .topbar .menu-list a { color: var(--ink) !important; padding: 8px 10px; border-radius: 6px; }
 .topbar .menu-list a:hover { background: var(--orange-soft); }
 details > summary.btn { list-style: none; }
@@ -146,7 +146,7 @@ details > summary.btn::-webkit-details-marker { display: none; }
 .nav-burger { display: none; cursor: pointer; flex-direction: column; justify-content: center; gap: 4px; padding: 8px; margin: 0; }
 .nav-burger span { display: block; width: 22px; height: 2px; border-radius: 2px; background: #e9e4dc; }
 @media (max-width: 900px) {
-  .topbar { flex-wrap: wrap; height: auto; min-height: 64px; padding: 6px 12px; gap: 8px 12px; position: relative; }
+  .topbar { flex-wrap: wrap; height: auto; min-height: 72px; padding: 8px 14px; gap: 8px 12px; position: relative; }
   .topbar .brand { order: 1; }
   .topbar .org { order: 2; margin-left: auto; font-size: 12px; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topbar .usermenu { order: 3; }
@@ -195,12 +195,13 @@ details > summary.btn::-webkit-details-marker { display: none; }
 
 /* Brand (logo files in /public/brand) */
 .topbar .brand { display: flex; align-items: center; }
-.topbar .brand img { display: block; height: 54px; width: auto; }
+.topbar .brand img { display: block; height: 64px; width: auto; }
 .lp-brand { display: flex; align-items: center; }
 .lp-brand img { display: block; height: 56px; width: auto; }
 .lp-hero-in { display: flex; align-items: center; gap: 48px; }
 .lp-hero-logo { width: 220px; height: auto; flex-shrink: 0; }
 @media (max-width: 760px) { .lp-hero-in { flex-direction: column; align-items: flex-start; gap: 24px; } .lp-hero-logo { width: 150px; } }
-@media (max-width: 900px) { .topbar .brand img { height: 46px; } }
+@media (max-width: 900px) { .topbar .brand img { height: 52px; } }
 .page-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
 .page-brand img { height: 56px; width: auto; display: block; }
+@media (min-width: 901px) and (max-width: 1320px) { .topbar { gap: 20px; padding: 0 20px; } .topbar nav { gap: 6px 16px; } .topbar nav a, .topbar .menu summary { font-size: 14px; } }
