@@ -99,5 +99,7 @@ export async function createSale(_prev: SaleState, form: FormData): Promise<Sale
       : method === "boleto"
         ? "Venda registrada. Gere o boleto logo abaixo, em Pagamento."
         : "Venda registrada. Gere o Pix ou envie para a maquininha logo abaixo, em Pagamento.";
+  // Paid now or on credit: straight to the receipt, print dialog open. Charged later: the sale page, to create the Pix/boleto first.
+  if (payNow || how === "term") redirect(`/os/${id}/cupom?auto=1`);
   redirect(`/os/${id}?ok=${encodeURIComponent(ok)}`);
 }

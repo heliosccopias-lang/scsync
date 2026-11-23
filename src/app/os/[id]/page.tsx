@@ -190,6 +190,7 @@ export default async function ServiceOrderPage({
               {canPrice ? <Link href={`/os/${id}/imprimir`}>{os.kind === "quote" ? "Orçamento" : "OS"} (via do cliente)</Link> : null}
               <Link href={`/os/${id}/imprimir?modo=producao`}>Ordem de produção (oficina)</Link>
               {seesPayment ? <Link href={`/os/${id}/recibo`}>Recibo dos pagamentos</Link> : null}
+              {canPrice ? <Link href={`/os/${id}/cupom`}>{os.channel === "counter" ? "Comprovante da venda" : "Comprovante (itens e pagamento)"}</Link> : null}
               <a href={publicUrl} target="_blank" rel="noreferrer">
                 Abrir link do cliente
               </a>

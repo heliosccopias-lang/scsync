@@ -41,6 +41,8 @@ export function CounterSaleForm({
   function onInput(e: FormEvent<HTMLFormElement>) {
     const form = e.currentTarget;
     const t = e.target as HTMLInputElement;
+    // Only the item lines and the discount change the totals; leave the payment fields alone.
+    if (!/^item_|^discount$/.test(t.name ?? "")) return;
     const m = /^item_desc_(\d+)$/.exec(t.name ?? "");
     if (m) {
       const hit = catalog.find((c) => c.name.toLowerCase() === t.value.trim().toLowerCase());
@@ -182,7 +184,7 @@ export function CounterSaleForm({
         <div className="grid2" style={{ marginTop: 8 }}>
           <div className="field">
             <label htmlFor="method">Forma</label>
-            <select id="method" name="method" value={method} onChange={(e) => setMethod(e.target.value)} {...bad("method")}>
+            <select id="method" name="method" defaultValue={method} onChange={(e) => setMethod(e.currentTarget.value)} {...bad("method")}>
               {canReceive ? (
                 <optgroup label="À vista: recebido agora">
                   <option value="cash">Dinheiro</option>
@@ -229,7 +231,7 @@ export function CounterSaleForm({
             {conditions.length ? (
               <div className="field">
                 <label htmlFor="condition_id">Condição cadastrada</label>
-                <select id="condition_id" name="condition_id" value={condition} onChange={(e) => setCondition(e.target.value)} {...bad("condition_id")}>
+                <select id="condition_id" name="condition_id" defaultValue={condition} onChange={(e) => setCondition(e.currentTarget.value)} {...bad("condition_id")}>
                   <option value="">Nenhuma: definir parcelas abaixo</option>
                   {conditions.map((c) => (
                     <option key={c.id} value={c.id}>
