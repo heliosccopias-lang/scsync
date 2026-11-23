@@ -56,8 +56,8 @@ begin
   if v_total <= 0 then raise exception 'total_not_positive'; end if;
 
   -- frozen = installments whose receivable already has money on it
-  select coalesce(sum(i.amount_cents), 0), coalesce(sum(case when r.paid_cents > 0 then 0 else 1 end), 0)::int
-    into v_frozen, v_open_n
+  select coalesce(sum(i.amount_cents), 0)
+    into v_frozen
     from service_order_installments i
     left join receivables r on r.installment_id = i.id and r.status <> 'cancelled'
    where i.service_order_id = v_os.id and coalesce(r.paid_cents, 0) > 0;
