@@ -106,11 +106,12 @@ export default async function PayablesPage({
                     <td className="num">{formatBRL(isOpen ? r.amount_cents - r.paid_cents : 0)}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       {isOpen && canEdit ? (
-                        <details>
+                        <details className="popover">
                           <summary className="btn btn-secondary" style={{ padding: "3px 8px", fontSize: 12 }}>
                             Pagar…
                           </summary>
-                          <div className="card" style={{ position: "absolute", zIndex: 5, marginTop: 4, width: 330 }}>
+                          <div className="card popover-panel" style={{ position: "absolute", zIndex: 5, marginTop: 4, width: 330 }}>
+                            <button type="button" className="popover-close" data-close aria-label="Fechar">✕</button>
                             <input type="hidden" form={`pay-${r.id}`} name="id" value={r.id} />
                             <div className="field">
                               <label>Valor pago (R$)</label>

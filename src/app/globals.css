@@ -309,3 +309,14 @@ details > summary.btn::-webkit-details-marker { display: none; }
 .items-totals strong { font-size: 17px; }
 .items-grand strong { font-size: 24px; color: var(--ink); }
 .items-grand { background: var(--orange-soft); padding: 8px 14px; border-radius: 10px; }
+
+/* Small floating forms opened from a <details className="popover"> (e.g. "Pagar…"): closed by MenuCloser. */
+details.popover { position: relative; display: inline-block; }
+details.popover > summary { list-style: none; }
+details.popover > summary::-webkit-details-marker { display: none; }
+details.popover > .popover-panel { right: 0; padding-top: 28px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); }
+.popover-close {
+  position: absolute; top: 6px; right: 8px; border: 0; background: transparent;
+  font-size: 16px; line-height: 1; cursor: pointer; color: var(--muted, #777); padding: 4px;
+}
+.popover-close:hover { color: inherit; }

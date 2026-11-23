@@ -234,11 +234,12 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                     {it.track_stock && !canEdit ? (
                       <span>{Number(it.stock_qty).toLocaleString("pt-BR")} {it.unit}</span>
                     ) : it.track_stock ? (
-                      <details>
+                      <details className="popover">
                         <summary style={{ cursor: "pointer", color: Number(it.stock_qty) <= 0 ? "var(--bad)" : undefined }}>
                           {Number(it.stock_qty).toLocaleString("pt-BR")} {it.unit}
                         </summary>
-                        <form action={stockEntry} className="card" style={{ position: "absolute", zIndex: 5, width: 300, textAlign: "left" }}>
+                        <form action={stockEntry} className="card popover-panel" style={{ position: "absolute", zIndex: 5, width: 300, textAlign: "left" }}>
+                          <button type="button" className="popover-close" data-close aria-label="Fechar">✕</button>
                           <input type="hidden" name="id" value={it.id} />
                           <div className="field">
                             <label>Quantidade</label>
