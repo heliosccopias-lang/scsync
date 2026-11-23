@@ -20,6 +20,7 @@ export function CounterSaleForm({
   attendants,
   defaultAttendant,
   canManageAttendants,
+  conditions = [],
 }: {
   catalog: CatalogEntry[];
   customers: { id: string; name: string }[];
@@ -27,12 +28,14 @@ export function CounterSaleForm({
   attendants: { id: string; name: string }[];
   defaultAttendant: string;
   canManageAttendants: boolean;
+  conditions?: { id: string; name: string }[];
 }) {
   const [state, action, pending] = useActionState<SaleState, FormData>(createSale, {});
   const v = state.values ?? {};
   const [total, setTotal] = useState(0);
   const [lineTotals, setLineTotals] = useState<number[]>(() => Array(SALE_LINES).fill(0));
   const [method, setMethod] = useState(v.method ?? (canReceive ? "cash" : "later"));
+  const [condition, setCondition] = useState(v.condition_id ?? "");
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
 
   function onInput(e: FormEvent<HTMLFormElement>) {
@@ -175,20 +178,26 @@ export function CounterSaleForm({
       </div>
 
       <div className="card" style={{ marginBottom: 12 }}>
-        <strong>Pagamento</strong>
+        <strong>Condição de pagamento</strong>
         <div className="grid2" style={{ marginTop: 8 }}>
           <div className="field">
             <label htmlFor="method">Forma</label>
             <select id="method" name="method" value={method} onChange={(e) => setMethod(e.target.value)} {...bad("method")}>
               {canReceive ? (
-                <>
-                  <option value="cash">Dinheiro (recebido agora)</option>
-                  <option value="pix">Pix direto na conta (recebido agora)</option>
-                  <option value="debit_card">Cartão de débito na maquininha (recebido agora)</option>
-                  <option value="credit_card">Cartão de crédito na maquininha (recebido agora)</option>
-                </>
+                <optgroup label="À vista: recebido agora">
+                  <option value="cash">Dinheiro</option>
+                  <option value="pix">Pix direto na conta</option>
+                  <option value="debit_card">Cartão de débito (maquininha)</option>
+                  <option value="credit_card">Cartão de crédito (maquininha, à vista ou parcelado)</option>
+                  <option value="transfer">Transferência / TED</option>
+                </optgroup>
               ) : null}
-              <option value="later">Cobrar em seguida: Pix Asaas ou maquininha integrada</option>
+              <optgroup label="Cobrar em seguida">
+                <option value="later">Pix Asaas, boleto ou maquininha integrada</option>
+              </optgroup>
+              <optgroup label="A prazo (cliente cadastrado)">
+                <option value="term">Parcelado / condição de pagamento (30/60/90…)</option>
+              </optgroup>
             </select>
           </div>
           {method === "credit_card" ? (
@@ -197,9 +206,9 @@ export function CounterSaleForm({
               <input id="card_installments" name="card_installments" type="number" min={1} max={24} defaultValue={v.card_installments ?? 1} />
             </div>
           ) : null}
-          {method === "debit_card" || method === "credit_card" ? (
+          {method === "debit_card" || method === "credit_card" || method === "transfer" ? (
             <div className="field">
-              <label htmlFor="reference">Código de autorização / NSU (opcional)</label>
+              <label htmlFor="reference">{method === "transfer" ? "Identificação da transferência (opcional)" : "Código de autorização / NSU (opcional)"}</label>
               <input id="reference" name="reference" defaultValue={v.reference} />
             </div>
           ) : null}
@@ -208,18 +217,62 @@ export function CounterSaleForm({
               <label htmlFor="later_method">Como vai cobrar</label>
               <select id="later_method" name="later_method" defaultValue={v.later_method ?? "pix"}>
                 <option value="pix">Pix (Asaas, QR Code na tela)</option>
+                <option value="boleto">Boleto (Asaas)</option>
                 <option value="debit_card">Maquininha integrada (débito)</option>
                 <option value="credit_card">Maquininha integrada (crédito)</option>
               </select>
             </div>
           ) : null}
         </div>
+        {method === "term" ? (
+          <div className="grid2">
+            {conditions.length ? (
+              <div className="field">
+                <label htmlFor="condition_id">Condição cadastrada</label>
+                <select id="condition_id" name="condition_id" value={condition} onChange={(e) => setCondition(e.target.value)} {...bad("condition_id")}>
+                  <option value="">Nenhuma: definir parcelas abaixo</option>
+                  {conditions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            <div className="field">
+              <label htmlFor="term_method">Cobrar cada parcela por</label>
+              <select key={condition ? "cond" : "manual"} id="term_method" name="term_method" defaultValue={v.term_method ?? (condition ? "" : "boleto")}>
+                {condition ? <option value="">Forma padrão da condição</option> : null}
+                <option value="boleto">Boleto</option>
+                <option value="pix">Pix</option>
+                <option value="credit_card">Cartão de crédito</option>
+                <option value="transfer">Transferência</option>
+                <option value="cash">Dinheiro (carnê / crediário)</option>
+              </select>
+            </div>
+            {!condition ? (
+              <>
+                <div className="field">
+                  <label htmlFor="term_count">Número de parcelas</label>
+                  <input id="term_count" name="term_count" type="number" min={1} max={48} defaultValue={v.term_count ?? 1} {...bad("term_count")} />
+                </div>
+                <div className="field">
+                  <label htmlFor="term_first_due">1º vencimento</label>
+                  <input id="term_first_due" name="term_first_due" type="date" defaultValue={v.term_first_due ?? ""} {...bad("term_first_due")} />
+                </div>
+              </>
+            ) : null}
+            <p className="muted" style={{ gridColumn: "1 / -1", margin: 0 }}>
+              Venda a prazo precisa de um cliente cadastrado (não vale &quot;Consumidor final&quot;). As parcelas entram em Contas a receber.
+            </p>
+          </div>
+        ) : null}
         <div className="field">
           <label htmlFor="notes">Observação (opcional)</label>
           <input id="notes" name="notes" defaultValue={v.notes} />
         </div>
         <button className="btn btn-primary" disabled={pending} style={{ fontSize: 16, padding: "10px 18px" }}>
-          {pending ? "Registrando…" : method === "later" ? "Registrar venda e cobrar" : "Finalizar venda"}
+          {pending ? "Registrando…" : method === "later" ? "Registrar venda e cobrar" : method === "term" ? "Registrar venda a prazo" : "Finalizar venda"}
         </button>
       </div>
     </form>
