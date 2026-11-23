@@ -5,6 +5,7 @@ import { requireOrg } from "@/lib/session";
 import type { ImportItem } from "@/lib/catalog-import";
 import { catalogMatcher } from "@/lib/catalog-import-db";
 import { importCsv } from "./import-actions";
+import { EditButton } from "./EditButton";
 import { ImportPreview } from "./ImportPreview";
 
 function back(key: "error" | "ok", msg: string, tipo?: string): never {
@@ -207,7 +208,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             {(items ?? []).map((it) => (
               <tr key={it.id} style={it.active ? undefined : { opacity: 0.55 }}>
                 <td colSpan={3} style={{ padding: 0 }}>
-                  <details>
+                  <details id={`edit-${it.id}`}>
                     <summary style={{ display: "grid", gridTemplateColumns: "1fr 90px 140px", padding: "10px 12px", cursor: "pointer" }}>
                       <span>
                         {it.code ? <span className="muted" style={{ marginRight: 8 }}>{it.code}</span> : null}
@@ -276,6 +277,8 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                 <td>{it.active ? <span className="pill pill-paid">Ativo</span> : <span className="pill pill-neutral">Inativo</span>}</td>
                 {canEdit ? (
                 <td>
+                  <div className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
+                  <EditButton id={it.id} />
                   <form action={toggle}>
                     <input type="hidden" name="id" value={it.id} />
                     <input type="hidden" name="kind" value={it.kind} />
@@ -284,6 +287,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                       {it.active ? "Desativar" : "Reativar"}
                     </button>
                   </form>
+                  </div>
                 </td>
                 ) : null}
               </tr>
@@ -314,7 +318,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
       </form>
       ) : null}
       <p className="muted" style={{ marginTop: 12 }}>
-        {canEdit ? "Clique no nome para editar. " : ""}Na OS, ao digitar o nome de um item cadastrado, o preço é preenchido sozinho.
+        {canEdit ? "Use ✎ Editar (ou clique no nome) para mudar código, nome, unidade e preço. " : ""}Na OS, ao digitar o nome de um item cadastrado, o preço é preenchido sozinho.
       </p>
     </Shell>
   );
