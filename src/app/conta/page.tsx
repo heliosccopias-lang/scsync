@@ -5,7 +5,8 @@ import { hasSudo } from "@/lib/sudo";
 import { MODULES, PERMS, ROLES, rolePerms } from "@/lib/access";
 import { fmtDate } from "@/lib/format";
 import { CopyButton } from "@/components/CopyButton";
-import { addAccess, confirmSudo, createUser, resetPassword, saveCompany, updateMember } from "./actions";
+import { addAccess, confirmSudo, createUser, resetPassword, saveCompany, setSharing, updateMember } from "./actions";
+import { PreviewForm } from "@/components/PreviewControls";
 
 const MODEL: Record<string, string> = { services: "Só serviços", products: "Só produtos", both: "Serviços e produtos" };
 const STATUS: Record<string, string> = { trial: "Período de teste", active: "Ativa", past_due: "Mensalidade em atraso", suspended: "Suspensa", cancelled: "Cancelada" };
@@ -89,6 +90,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     .map((u) => ({ id: u, name: (prof.get(u)?.name as string) || "", email: (prof.get(u)?.email as string) || "", pending: !!prof.get(u)?.must_change_password, owner: ownerIds.has(u), access: (members ?? []).filter((m) => m.user_id === u) }))
     .sort((a, b) => Number(b.owner) - Number(a.owner) || (a.name || a.email).localeCompare(b.name || b.email, "pt-BR"));
   const nonOwnerCount = people.filter((p) => !p.owner).length;
+  const { data: accRow } = await admin.from("accounts").select("share_catalog").eq("id", ctx.accountId).maybeSingle();
+  const shared = Boolean(accRow?.share_catalog);
 
   return (
     <Shell>
@@ -180,6 +183,42 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </select>
         <button className="btn btn-primary">Criar empresa</button>
       </form>
+
+      <section className="card" style={{ marginBottom: 24 }}>
+        <div className="spread">
+          <div>
+            <strong>Produtos compartilhados entre as empresas</strong>{" "}
+            {shared ? <span className="pill pill-paid">Ligado</span> : <span className="pill pill-neutral">Desligado</span>}
+            <div className="muted" style={{ fontSize: 13, marginTop: 4, maxWidth: 640 }}>
+              Ligado, os produtos (papel, tinta, envelope, agenda, caneta…) ficam iguais em todos os CNPJs da conta: nome, código, preço e situação. O
+              estoque continua separado por CNPJ. Clientes nunca são compartilhados. Onde houver diferença, vale o cadastro da empresa aberta agora (
+              {ctx.orgName}).
+            </div>
+          </div>
+          <div className="row">
+            <form action={setSharing}>
+              <input type="hidden" name="on" value="true" />
+              <button className="btn btn-primary">{shared ? "Sincronizar agora" : "Ligar compartilhamento"}</button>
+            </form>
+            {shared ? (
+              <form action={setSharing}>
+                <input type="hidden" name="on" value="false" />
+                <button className="btn btn-secondary">Desligar</button>
+              </form>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginBottom: 24, borderColor: "var(--orange)" }}>
+        <strong>👁 Visualizar como cliente</strong>
+        <p className="muted" style={{ fontSize: 13, margin: "4px 0 10px", maxWidth: 680 }}>
+          Depois de configurar módulos, perfis e plano, veja como o sistema fica para um usuário com determinado perfil ou para uma gráfica num
+          determinado plano. Menus, telas e botões aparecem exatamente como para essa pessoa. Nada é gravado enquanto estiver visualizando; para sair,
+          use o botão na faixa escura do topo.
+        </p>
+        <PreviewForm />
+      </section>
 
       <h2>Usuários e perfis</h2>
       <p className="muted" style={{ marginTop: 0 }}>

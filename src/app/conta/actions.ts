@@ -92,8 +92,17 @@ export async function createUser(form: FormData) {
   } else {
     // Already has a login (e.g. works for another company): just give access, keep their password.
     const { data: prof } = await admin.from("user_profiles").select("user_id").eq("email", email).maybeSingle();
-    if (!prof) back("error", "Não foi possível criar o login para esse e-mail.");
-    userId = prof.user_id as string;
+    let found = (prof?.user_id as string | undefined) ?? null;
+    // Signed up alone (e.g. tried the free trial first): find the login itself.
+    for (let page = 1; !found && page <= 20; page++) {
+      const { data: list } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+      found = list?.users.find((u) => u.email?.toLowerCase() === email)?.id ?? null;
+      if (!list || list.users.length < 200) break;
+    }
+    if (!found) back("error", "Não foi possível criar o login para esse e-mail.");
+    userId = found;
+    await admin.auth.admin.updateUserById(userId, { email_confirm: true });
+    await admin.from("user_profiles").upsert({ user_id: userId, name, email }, { onConflict: "user_id" });
   }
   if (!users.has(userId) && users.size >= ctx.account.max_users) back("error", `Seu plano permite até ${ctx.account.max_users} usuários.`);
 
@@ -152,4 +161,13 @@ export async function resetPassword(form: FormData) {
   if (error) back("error", "Não foi possível gerar a senha.");
   await admin.from("user_profiles").update({ must_change_password: true }).eq("user_id", userId);
   back("ok", "Senha provisória gerada. Passe para a pessoa; ela cria a própria senha no próximo acesso.", `&senha=${encodeURIComponent(password)}`);
+}
+
+/** Products shared between the account's companies (stock stays per CNPJ). The current company wins on differences. */
+export async function setSharing(form: FormData) {
+  const ctx = await owner();
+  const on = form.get("on") === "true";
+  const { data, error } = await ctx.sb.rpc("set_catalog_sharing", { p_account: ctx.accountId, p_on: on, p_source: ctx.orgId });
+  if (error) back("error", "Não foi possível mudar o compartilhamento de produtos.");
+  back("ok", on ? `Produtos compartilhados entre as empresas (${data} produto(s) em comum). O estoque continua separado por CNPJ.` : "Compartilhamento desligado: cada empresa passa a cuidar dos próprios produtos.");
 }

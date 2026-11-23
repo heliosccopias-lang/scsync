@@ -166,3 +166,11 @@ details > summary.btn::-webkit-details-marker { display: none; }
   main th, main td { white-space: nowrap; }
   .card { padding: 14px; }
 }
+
+/* "Visualizar como" strip */
+.preview-bar { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 8px 14px; background: var(--ink); color: #fff; font-size: 14px; }
+.preview-bar strong { color: var(--orange); }
+.preview-bar .menu-list { color: var(--ink); }
+.tag-counter { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--orange-soft); color: var(--orange-ink); margin-left: 6px; vertical-align: middle; }
+.preview-cta { display: flex; justify-content: flex-end; padding: 6px 16px 0; max-width: 1200px; margin: 0 auto; }
+.preview-cta .menu-list { top: 34px; }

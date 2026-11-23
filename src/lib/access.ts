@@ -71,7 +71,9 @@ const RULES: Rule[] = [
   { prefix: "/cadastros/checklists", module: "os", any: ["settings", "os.edit"] },
   { prefix: "/cadastros/itens", any: ["catalog.edit", "os.view"] },
   { prefix: "/cadastros/clientes", any: ["customers.edit", "os.view", "finance.view"] },
+  { prefix: "/os/nova", module: "os", any: ["os.edit"] },
   { prefix: "/os", module: "os", any: ["os.view"] },
+  { prefix: "/vendas", module: "finance", any: ["os.edit"] },
   { prefix: "/receber", module: "finance", any: ["finance.view", "finance.receive"] },
   { prefix: "/pagar", module: "finance", any: ["finance.view"] },
   { prefix: "/conciliacao", module: "bank_reconciliation", any: ["finance.edit"] },
@@ -100,3 +102,20 @@ export const canOpen = (path: string, c: AccessCtx) => denyReason(path, c) === n
 export function homeFor(c: AccessCtx): string {
   return ["/os", "/receber", "/cadastros/itens", "/relatorios", "/cadastros/clientes"].find((p) => canOpen(p, c)) ?? "/sem-acesso";
 }
+
+// ---------------------------------------------------------------- "Visualizar como" (owner only)
+/** Cookie holding what the owner is previewing: a profile and/or a plan. */
+export const PREVIEW_COOKIE = "scsync_preview";
+export const PREVIEW_PLANS = ["trial", "servicos", "servicos_produtos", "completo"] as const;
+export type Preview = { role: string | null; plan: (typeof PREVIEW_PLANS)[number] | null };
+
+/** Reads the cookie; anything unknown is ignored. A custom profile has no fixed permissions, so it cannot be previewed. */
+export function parsePreview(raw: string | null | undefined): Preview | null {
+  if (!raw) return null;
+  const [role, plan] = raw.split("|");
+  const r = ROLES.some((x) => x.key === role && x.key !== "custom") ? role : null;
+  const p = (PREVIEW_PLANS as readonly string[]).includes(plan) ? (plan as Preview["plan"]) : null;
+  return r || p ? { role: r, plan: p } : null;
+}
+export const previewCookieValue = (role: string | null, plan: string | null) => `${role ?? ""}|${plan ?? ""}`;
+export const roleLabel = (key: string) => ROLES.find((r) => r.key === key)?.label ?? key;

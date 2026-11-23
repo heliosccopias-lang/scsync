@@ -2,8 +2,8 @@ import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseUser } from "./supabase";
-import { denyReason, type AccessCtx } from "./access";
-import { billingBlock, planAllows } from "./plans";
+import { denyReason, parsePreview, PREVIEW_COOKIE, roleLabel, rolePerms, type AccessCtx } from "./access";
+import { billingBlock, planAllows, planOf } from "./plans";
 import { todayInSaoPaulo } from "./money";
 
 export const ORG_COOKIE = "scsync_org";
@@ -40,7 +40,8 @@ export const requireOrg = cache(async () => {
   }
   if (!byId.size) redirect(ownerAccounts.size ? "/conta" : "/onboarding");
 
-  const wanted = (await cookies()).get(ORG_COOKIE)?.value;
+  const jar = await cookies();
+  const wanted = jar.get(ORG_COOKIE)?.value;
   const orgs = [...byId.values()].map((v) => v.org).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   const current = byId.get(wanted ?? "") ?? byId.get(orgs[0].id)!;
   const org = current.org;
@@ -51,12 +52,17 @@ export const requireOrg = cache(async () => {
     sb.from("accounts").select("id, name, status, plan, billing_cycle, price_cents, trial_ends_at, paid_until, cancel_at_period_end, max_companies, max_users").eq("id", org.account_id).single(),
     sb.from("user_profiles").select("name, must_change_password").eq("user_id", user.id).maybeSingle(),
   ]);
-  const perms = new Set<string>((permList as string[] | null) ?? []);
+  // "Visualizar como": the owner sees the system as a profile and/or a plan would. Nothing is saved meanwhile.
+  const preview = isOwner ? parsePreview(jar.get(PREVIEW_COOKIE)?.value) : null;
+  const actsAsOwner = isOwner && !preview?.role;
+  const perms = preview?.role ? new Set<string>(rolePerms(preview.role)) : new Set<string>((permList as string[] | null) ?? []);
   // A module is on when the company turned it on and the plan includes it.
   const acc = account as { plan: string; status: string } | null;
+  const plan = preview?.plan ? (preview.plan === "trial" ? acc?.plan : preview.plan) : acc?.plan;
+  const status = preview?.plan ? (preview.plan === "trial" ? "trial" : "active") : (acc?.status ?? "trial");
   const modules: Record<string, boolean> = {};
   for (const k of ["os", "stock", "commissions", "finance", "asaas", "bank_reconciliation", "cards", "nfse"]) {
-    modules[k] = (org.modules ?? {})[k] !== false && planAllows(acc?.plan, acc?.status ?? "trial", k);
+    modules[k] = (org.modules ?? {})[k] !== false && planAllows(plan, status, k);
   }
   const ctx = {
     sb,
@@ -64,10 +70,24 @@ export const requireOrg = cache(async () => {
     orgId: org.id,
     orgName: org.name,
     orgCnpj: org.cnpj,
-    role: isOwner ? "owner" : current.role,
-    isOwner,
+    role: preview?.role ?? (isOwner ? "owner" : current.role),
+    isOwner: actsAsOwner,
+    /** The real owner, even while previewing. */
+    realOwner: isOwner,
+    preview: preview
+      ? {
+          role: preview.role,
+          plan: preview.plan,
+          label: [
+            preview.role ? `perfil ${roleLabel(preview.role)}` : "perfil Dono",
+            preview.plan ? (preview.plan === "trial" ? "período de teste" : `plano ${planOf(preview.plan)?.name}`) : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        }
+      : null,
     perms,
-    can: (p: string) => isOwner || perms.has(p),
+    can: (p: string) => actsAsOwner || perms.has(p),
     modules,
     module: (k: string) => modules[k] !== false,
     account: account as {
@@ -89,7 +109,12 @@ export const requireOrg = cache(async () => {
   };
 
   // Central guard (the proxy passes the path). Server actions post to the page they belong to.
-  const path = (await headers()).get("x-pathname") ?? "";
+  const h = await headers();
+  const path = h.get("x-pathname") ?? "";
+  // Preview is look-only: any save (server action) is stopped before it runs.
+  if (preview && h.get("next-action")) {
+    redirect(`${path || "/"}?error=${encodeURIComponent("Modo visualização: nada é gravado. Saia da visualização para fazer alterações.")}`);
+  }
   if (profile?.must_change_password && !path.startsWith("/minha-senha")) redirect("/minha-senha?primeiro=1");
   const blocked = billingBlock(ctx.account, todayInSaoPaulo());
   if (blocked && !["/conta", "/minha-senha", "/sem-acesso"].some((p) => path.startsWith(p))) redirect(`/sem-acesso?motivo=${encodeURIComponent(blocked)}`);

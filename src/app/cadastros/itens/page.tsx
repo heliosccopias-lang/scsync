@@ -13,7 +13,9 @@ function back(key: "error" | "ok", msg: string, tipo?: string): never {
 
 async function save(form: FormData) {
   "use server";
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) back("error", "Seu perfil não altera o cadastro de itens.");
+  const { sb, orgId } = ctx;
   const id = String(form.get("id") ?? "");
   const kind = form.get("kind") === "product" ? "product" : "service";
   const name = String(form.get("name") ?? "").trim();
@@ -32,7 +34,9 @@ async function save(form: FormData) {
 
 async function toggle(form: FormData) {
   "use server";
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) back("error", "Seu perfil não altera o cadastro de itens.");
+  const { sb, orgId } = ctx;
   const active = form.get("active") === "true";
   await sb.from("catalog_items").update({ active: !active }).eq("id", String(form.get("id"))).eq("org_id", orgId);
   back("ok", active ? "Item desativado: não aparece mais nas novas OS." : "Item reativado.", String(form.get("kind")));
@@ -40,7 +44,9 @@ async function toggle(form: FormData) {
 
 async function stockEntry(form: FormData) {
   "use server";
-  const { sb, orgId, user } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) back("error", "Seu perfil não altera o estoque.");
+  const { sb, orgId, user } = ctx;
   const qty = Number(String(form.get("qty") ?? "").replace(",", "."));
   const reason = form.get("reason") === "adjust" ? "adjust" : "purchase";
   if (!qty || !Number.isFinite(qty)) back("error", "Informe a quantidade (use negativo para retirar no ajuste).", "product");
@@ -59,7 +65,9 @@ async function stockEntry(form: FormData) {
 
 async function toggleStock(form: FormData) {
   "use server";
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) back("error", "Seu perfil não altera o cadastro de itens.");
+  const { sb, orgId } = ctx;
   const on = form.get("track") === "true";
   await sb.from("catalog_items").update({ track_stock: !on }).eq("id", String(form.get("id"))).eq("org_id", orgId);
   back("ok", on ? "Controle de estoque desligado para este produto." : "Controle de estoque ligado.", "product");
@@ -67,7 +75,9 @@ async function toggleStock(form: FormData) {
 
 async function saveAdjustments(form: FormData) {
   "use server";
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) back("error", "Seu perfil não altera o cadastro de itens.");
+  const { sb, orgId } = ctx;
   const labels: Record<string, string> = { external: "Externo", internal: "Interno", warranty: "Garantia" };
   for (const att of Object.keys(labels)) {
     const pct = Number(String(form.get(att) ?? "0").replace(",", ".") || 0);
@@ -83,7 +93,12 @@ async function saveAdjustments(form: FormData) {
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<{ tipo?: string; q?: string; error?: string; ok?: string; importacao?: string }> }) {
   const { tipo, q, error, ok, importacao } = await searchParams;
   const kind = tipo === "product" ? "product" : "service";
-  const { sb, orgId, orgName } = await requireOrg();
+  const { sb, orgId, orgName, can, module: hasModule, account } = await requireOrg();
+  const canEdit = can("catalog.edit");
+  const canPrice = can("prices.view");
+  const stockOn = hasModule("stock");
+  const { data: acc } = await sb.from("accounts").select("share_catalog").eq("id", account.id).maybeSingle();
+  const shared = Boolean(acc?.share_catalog);
   let query = sb.from("catalog_items").select("id, kind, code, name, unit, price_cents, active, track_stock, stock_qty").eq("org_id", orgId).eq("kind", kind).order("active", { ascending: false }).order("name");
   if (q) {
     const term = q.replace(/[%,()]/g, " ").trim();
@@ -117,6 +132,12 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         </form>
       </div>
 
+      {kind === "product" && shared ? (
+        <p className="notice" style={{ background: "var(--orange-soft)", color: "var(--ink)" }}>
+          Produtos compartilhados entre as empresas da conta: nome, código, preço e situação mudam em todas; o estoque é de cada CNPJ.
+        </p>
+      ) : null}
+      {canEdit ? (
       <form action={save} className="card" style={{ marginBottom: 16 }}>
         <input type="hidden" name="kind" value={kind} />
         <div className="row" style={{ alignItems: "flex-end", flexWrap: "nowrap" }}>
@@ -139,14 +160,16 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           <button className="btn btn-primary">Cadastrar</button>
         </div>
       </form>
+      ) : null}
 
-      {draft && match ? (
+      {draft && match && canEdit ? (
         <ImportPreview
           draft={{ ...draft, items: draft.items as ImportItem[], errors: draft.errors as string[] }}
           match={match}
         />
       ) : null}
 
+      {canEdit ? (
       <details className="card" style={{ marginBottom: 16 }}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>Importar planilha (CSV)</summary>
         <form action={importCsv} style={{ marginTop: 12 }}>
@@ -164,6 +187,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           </div>
         </form>
       </details>
+      ) : null}
 
       {(items ?? []).length === 0 ? (
         <div className="card empty">Nenhum {kind === "service" ? "serviço" : "produto"} cadastrado ainda.</div>
@@ -173,10 +197,10 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             <tr>
               <th>Nome</th>
               <th>Unidade</th>
-              <th className="num">Preço</th>
-              {kind === "product" ? <th className="num">Estoque</th> : null}
+              <th className="num">{canPrice ? "Preço" : ""}</th>
+              {kind === "product" && stockOn ? <th className="num">Estoque</th> : null}
               <th>Situação</th>
-              <th></th>
+              {canEdit ? <th></th> : null}
             </tr>
           </thead>
           <tbody>
@@ -190,8 +214,9 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                         {it.name}
                       </span>
                       <span>{it.unit}</span>
-                      <span style={{ textAlign: "right" }}>{formatBRL(it.price_cents)}</span>
+                      <span style={{ textAlign: "right" }}>{canPrice ? formatBRL(it.price_cents) : ""}</span>
                     </summary>
+                    {canEdit ? (
                     <form action={save} className="row" style={{ padding: "0 12px 12px", flexWrap: "nowrap" }}>
                       <input type="hidden" name="id" value={it.id} />
                       <input type="hidden" name="kind" value={it.kind} />
@@ -201,11 +226,14 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                       <input name="price" defaultValue={(it.price_cents / 100).toFixed(2).replace(".", ",")} aria-label="Preço" inputMode="decimal" style={{ width: 120 }} />
                       <button className="btn btn-secondary">Salvar</button>
                     </form>
+                    ) : null}
                   </details>
                 </td>
-                {kind === "product" ? (
+                {kind === "product" && stockOn ? (
                   <td className="num" style={{ whiteSpace: "nowrap" }}>
-                    {it.track_stock ? (
+                    {it.track_stock && !canEdit ? (
+                      <span>{Number(it.stock_qty).toLocaleString("pt-BR")} {it.unit}</span>
+                    ) : it.track_stock ? (
                       <details>
                         <summary style={{ cursor: "pointer", color: Number(it.stock_qty) <= 0 ? "var(--bad)" : undefined }}>
                           {Number(it.stock_qty).toLocaleString("pt-BR")} {it.unit}
@@ -233,6 +261,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                     ) : (
                       <span className="muted">—</span>
                     )}
+                    {canEdit ? (
                     <form action={toggleStock}>
                       <input type="hidden" name="id" value={it.id} />
                       <input type="hidden" name="track" value={String(it.track_stock)} />
@@ -240,9 +269,11 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                         {it.track_stock ? "Desligar controle" : "Controlar estoque"}
                       </button>
                     </form>
+                    ) : null}
                   </td>
                 ) : null}
                 <td>{it.active ? <span className="pill pill-paid">Ativo</span> : <span className="pill pill-neutral">Inativo</span>}</td>
+                {canEdit ? (
                 <td>
                   <form action={toggle}>
                     <input type="hidden" name="id" value={it.id} />
@@ -253,11 +284,13 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                     </button>
                   </form>
                 </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
         </table>
       )}
+      {canEdit ? (
       <form action={saveAdjustments} className="card" style={{ marginTop: 16 }}>
         <input type="hidden" name="kind" value={kind} />
         <strong>Lista de preço por tipo de atendimento</strong>
@@ -278,8 +311,9 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           <button className="btn btn-secondary">Salvar ajustes</button>
         </div>
       </form>
+      ) : null}
       <p className="muted" style={{ marginTop: 12 }}>
-        Clique no nome para editar. Na OS, ao digitar o nome de um item cadastrado, o preço é preenchido sozinho.
+        {canEdit ? "Clique no nome para editar. " : ""}Na OS, ao digitar o nome de um item cadastrado, o preço é preenchido sozinho.
       </p>
     </Shell>
   );

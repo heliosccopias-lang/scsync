@@ -11,7 +11,9 @@ function back(kind: string, key: "error" | "ok", msg: string, importId?: string)
 
 /** Step 1: read the file and keep it as a draft; nothing goes into the catalog yet. */
 export async function importCsv(form: FormData) {
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) redirect(`/cadastros/itens?error=${encodeURIComponent("Seu perfil não importa planilhas.")}`);
+  const { sb, orgId } = ctx;
   const kind = form.get("kind") === "product" ? "product" : "service";
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) back(kind, "error", "Escolha o arquivo CSV.");
@@ -34,7 +36,9 @@ export async function importCsv(form: FormData) {
 
 /** Step 2a: save the draft into the catalog. */
 export async function saveImport(form: FormData) {
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) redirect(`/cadastros/itens?error=${encodeURIComponent("Seu perfil não importa planilhas.")}`);
+  const { sb, orgId } = ctx;
   const id = String(form.get("id") ?? "");
   const kind = form.get("kind") === "product" ? "product" : "service";
   const { data: draft } = await sb.from("catalog_imports").select("id, items").eq("id", id).eq("org_id", orgId).maybeSingle();
@@ -49,7 +53,9 @@ export async function saveImport(form: FormData) {
 
 /** Step 2b: throw the draft away; the catalog is untouched. */
 export async function discardImport(form: FormData) {
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("catalog.edit")) redirect(`/cadastros/itens?error=${encodeURIComponent("Seu perfil não importa planilhas.")}`);
+  const { sb, orgId } = ctx;
   const kind = form.get("kind") === "product" ? "product" : "service";
   await sb.from("catalog_imports").delete().eq("id", String(form.get("id") ?? "")).eq("org_id", orgId);
   back(kind, "ok", "Planilha deletada. Nada foi gravado no cadastro.");

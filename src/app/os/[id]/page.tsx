@@ -53,6 +53,15 @@ export default async function ServiceOrderPage({
   const { sb, orgId, orgName, module: hasModule, can } = await requireOrg();
   const showNfse = hasModule("nfse") && (can("fiscal.issue") || can("finance.view"));
   const canReceive = can("finance.receive");
+  // What this profile may do on the screen (the database enforces the same rules).
+  const canEdit = can("os.edit");
+  const canStatus = canEdit || can("os.status");
+  const canCancel = can("os.cancel");
+  const canPrice = can("prices.view");
+  const canCustomer = can("customers.edit");
+  const canReverse = can("finance.reverse");
+  const seesPayment = canReceive || can("finance.view");
+  const canCharge = canReceive && hasModule("asaas") && hasModule("finance");
   const [{ data: terminals }, { data: posCharges }] = canReceive
     ? await Promise.all([
         sb.from("pos_terminals").select("id, name, provider").eq("org_id", orgId).eq("active", true).in("provider", ["stone", "mercadopago"]).order("name"),
@@ -165,7 +174,7 @@ export default async function ServiceOrderPage({
           </h1>
         </div>
         <div className="row">
-          {shareWa ? (
+          {shareWa && canPrice ? (
             <a className="btn btn-primary" href={shareWa} target="_blank" rel="noreferrer">
               Enviar {os.kind === "quote" ? "orçamento" : "OS"} por WhatsApp
             </a>
@@ -178,18 +187,19 @@ export default async function ServiceOrderPage({
           <details className="menu-inline">
             <summary className="btn btn-secondary">Imprimir ▾</summary>
             <div className="menu-list">
-              <Link href={`/os/${id}/imprimir`}>{os.kind === "quote" ? "Orçamento" : "OS"} (via do cliente)</Link>
+              {canPrice ? <Link href={`/os/${id}/imprimir`}>{os.kind === "quote" ? "Orçamento" : "OS"} (via do cliente)</Link> : null}
               <Link href={`/os/${id}/imprimir?modo=producao`}>Ordem de produção (oficina)</Link>
-              <Link href={`/os/${id}/recibo`}>Recibo dos pagamentos</Link>
+              {seesPayment ? <Link href={`/os/${id}/recibo`}>Recibo dos pagamentos</Link> : null}
               <a href={publicUrl} target="_blank" rel="noreferrer">
                 Abrir link do cliente
               </a>
             </div>
           </details>
+          {canStatus && os.status !== "cancelled" ? (
           <form action={setStatus} className="row">
             <input type="hidden" name="id" value={id} />
             <select name="status" defaultValue={os.status} aria-label="Status da OS" style={{ width: 190 }}>
-              {["open", "approved", "in_progress", "waiting_parts", "done", ...(os.status === "paid" ? ["paid"] : []), "cancelled"].map((s) => (
+              {["open", "approved", "in_progress", "waiting_parts", "done", ...(os.status === "paid" ? ["paid"] : []), ...(canCancel ? ["cancelled"] : [])].map((s) => (
                 <option key={s} value={s}>
                   {osStatusLabel(s)}
                 </option>
@@ -197,6 +207,7 @@ export default async function ServiceOrderPage({
             </select>
             <button className="btn btn-secondary">Alterar status</button>
           </form>
+          ) : null}
         </div>
       </div>
       <Notice error={error} ok={ok} />
@@ -206,10 +217,12 @@ export default async function ServiceOrderPage({
             <span>
               <strong>Orçamento.</strong> Envie ao cliente; quando ele aprovar, converta em ordem de serviço para lançar as contas e cobrar.
             </span>
-            <form action={convertQuote}>
-              <input type="hidden" name="id" value={id} />
-              <button className="btn btn-primary">Aprovar e converter em OS</button>
-            </form>
+            {canEdit ? (
+              <form action={convertQuote}>
+                <input type="hidden" name="id" value={id} />
+                <button className="btn btn-primary">Aprovar e converter em OS</button>
+              </form>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -224,6 +237,7 @@ export default async function ServiceOrderPage({
           <div className="muted">
             {customer?.cpf_cnpj ?? "sem CPF/CNPJ"} · {customer?.phone ?? "sem celular"} · {customer?.email ?? "sem e-mail"}
           </div>
+          {canCustomer ? (
           <details style={{ marginTop: 8 }} open={!customer?.cpf_cnpj}>
             <summary>Editar cliente</summary>
             <form action={updateCustomer} style={{ marginTop: 10 }}>
@@ -250,6 +264,7 @@ export default async function ServiceOrderPage({
               <button className="btn btn-secondary">Salvar cliente</button>
             </form>
           </details>
+          ) : null}
         </div>
         <div className="card">
           <div className="muted">Dados da OS</div>
@@ -292,10 +307,13 @@ export default async function ServiceOrderPage({
               </>
             ) : null}
           </dl>
+          {canStatus ? (
           <details style={{ marginTop: 8 }}>
-            <summary>Editar dados da OS e laudo técnico</summary>
+            <summary>{canEdit ? "Editar dados da OS e laudo técnico" : "Laudo técnico e observações internas"}</summary>
             <form action={updateDetails} style={{ marginTop: 10 }}>
               <input type="hidden" name="id" value={id} />
+              {canEdit ? (
+              <>
               <div className="grid2">
                 <div className="field">
                   <label htmlFor="d_tech">Técnico</label>
@@ -333,15 +351,24 @@ export default async function ServiceOrderPage({
                 </div>
               </div>
               <PrintSpecFields d={os} prefix="d_" />
+              </>
+              ) : (
+                <div className="field">
+                  <label htmlFor="d_delivery">Entrega prevista</label>
+                  <input id="d_delivery" name="delivery_date" type="date" defaultValue={os.delivery_date ?? ""} />
+                </div>
+              )}
               <div className="field">
                 <label htmlFor="d_report">Laudo técnico / diagnóstico</label>
                 <textarea id="d_report" name="technical_report" defaultValue={os.technical_report ?? ""} />
               </div>
               <div className="grid2">
+                {canEdit ? (
                 <div className="field">
                   <label htmlFor="d_notes">Observações (saem na OS)</label>
                   <textarea id="d_notes" name="notes" defaultValue={os.notes ?? ""} />
                 </div>
+                ) : null}
                 <div className="field">
                   <label htmlFor="d_internal">Observações internas</label>
                   <textarea id="d_internal" name="internal_notes" defaultValue={os.internal_notes ?? ""} />
@@ -350,6 +377,7 @@ export default async function ServiceOrderPage({
               <button className="btn btn-secondary">Salvar dados</button>
             </form>
           </details>
+          ) : null}
         </div>
       </div>
 
@@ -360,8 +388,8 @@ export default async function ServiceOrderPage({
             <th>Tipo</th>
             <th>Descrição</th>
             <th className="num">Qtd</th>
-            <th className="num">Unitário</th>
-            <th className="num">Total</th>
+            {canPrice ? <th className="num">Unitário</th> : null}
+            {canPrice ? <th className="num">Total</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -370,11 +398,11 @@ export default async function ServiceOrderPage({
               <td>{it.kind === "service" ? "Serviço" : "Produto"}</td>
               <td>{it.description}</td>
               <td className="num">{Number(it.quantity).toLocaleString("pt-BR")}</td>
-              <td className="num">{formatBRL(it.unit_price_cents)}</td>
-              <td className="num">{formatBRL(it.total_cents)}</td>
+              {canPrice ? <td className="num">{formatBRL(it.unit_price_cents)}</td> : null}
+              {canPrice ? <td className="num">{formatBRL(it.total_cents)}</td> : null}
             </tr>
           ))}
-          {os.discount_cents > 0 ? (
+          {canPrice && os.discount_cents > 0 ? (
             <tr>
               <td colSpan={4} className="num muted">
                 Desconto
@@ -382,6 +410,7 @@ export default async function ServiceOrderPage({
               <td className="num">− {formatBRL(os.discount_cents)}</td>
             </tr>
           ) : null}
+          {canPrice ? (
           <tr>
             <td colSpan={4} className="num">
               <strong>Total da OS</strong>
@@ -390,6 +419,7 @@ export default async function ServiceOrderPage({
               <strong>{formatBRL(os.total_cents)}</strong>
             </td>
           </tr>
+          ) : null}
         </tbody>
       </table>
 
@@ -397,7 +427,7 @@ export default async function ServiceOrderPage({
         <p className="muted" style={{ marginTop: 10 }}>
           Contas lançadas em {new Date(os.accounts_launched_at).toLocaleDateString("pt-BR")}: os serviços e produtos desta OS não podem mais ser alterados.
         </p>
-      ) : os.status !== "cancelled" ? (
+      ) : os.status !== "cancelled" && canEdit ? (
         <details style={{ marginTop: 12 }}>
           <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>
             Acrescentar ou editar serviços e produtos
@@ -414,7 +444,7 @@ export default async function ServiceOrderPage({
       ) : null}
 
 
-      {hasStockItems && os.kind === "order" ? (
+      {hasStockItems && os.kind === "order" && canEdit && hasModule("stock") ? (
         <div className="row" style={{ marginTop: 12 }}>
           {os.stock_launched_at ? (
             <>
@@ -441,9 +471,11 @@ export default async function ServiceOrderPage({
         <div className="card">
           <div className="spread" style={{ marginBottom: 8 }}>
             <strong>Checklists</strong>
-            <Link href="/cadastros/checklists" className="muted" style={{ fontSize: 13 }}>
-              Gerenciar
-            </Link>
+            {canEdit ? (
+              <Link href="/cadastros/checklists" className="muted" style={{ fontSize: 13 }}>
+                Gerenciar
+              </Link>
+            ) : null}
           </div>
           {(runs ?? []).length === 0 ? <p className="muted" style={{ margin: "0 0 8px" }}>Nenhum checklist nesta OS.</p> : null}
           {(runs ?? []).map((r) => {
@@ -456,7 +488,7 @@ export default async function ServiceOrderPage({
               </div>
             );
           })}
-          {(availableChecklists ?? []).length ? (
+          {!canStatus ? null : (availableChecklists ?? []).length ? (
             <form action={addChecklist} className="row" style={{ marginTop: 8, flexWrap: "nowrap" }}>
               <input type="hidden" name="id" value={id} />
               <select name="checklist_id" aria-label="Checklist" defaultValue="">
@@ -496,6 +528,7 @@ export default async function ServiceOrderPage({
                   )}
                 </a>
                 <div className="muted" style={{ fontSize: 11 }}>{fmtSize(f.size_bytes)}</div>
+                {canEdit ? (
                 <form action={removeAttachment}>
                   <input type="hidden" name="id" value={id} />
                   <input type="hidden" name="attachment_id" value={f.id} />
@@ -503,10 +536,11 @@ export default async function ServiceOrderPage({
                     Remover
                   </button>
                 </form>
+                ) : null}
               </div>
             ))}
           </div>
-          <Uploader orgId={orgId} folder={`service_order/${id}`} register={registerOsFiles} extra={{ os_id: id }} />
+          {canStatus ? <Uploader orgId={orgId} folder={`service_order/${id}`} register={registerOsFiles} extra={{ os_id: id }} /> : null}
         </div>
       </div>
       {showNfse && (invoices ?? []).length ? (
@@ -515,9 +549,11 @@ export default async function ServiceOrderPage({
           <InvoiceRows rows={(invoices ?? []) as Record<string, unknown>[]} back={`/os/${id}`} canIssue={can("fiscal.issue")} />
         </>
       ) : null}
+      {seesPayment ? (
+      <>
       <div className="spread" style={{ marginTop: 28 }}>
         <h2 style={{ margin: 0 }}>Pagamento</h2>
-        {!launched && os.kind !== "quote" && (installments ?? []).length > 0 ? (
+        {!launched && os.kind !== "quote" && (installments ?? []).length > 0 && canEdit ? (
           <form action={launch} className="row">
             <input type="hidden" name="id" value={id} />
             <span className="muted" style={{ fontSize: 13 }}>Depois de lançar, os itens da OS ficam travados.</span>
@@ -589,6 +625,7 @@ export default async function ServiceOrderPage({
                 <div className="notice" style={{ background: "var(--orange-soft)", color: "var(--ink)", marginBottom: 10 }}>
                   <div className="spread" style={{ marginBottom: 6 }}>
                     <strong>Cobrança Asaas: {CHARGE_STATUS[c.status] ?? c.status}</strong>
+                    {canReceive ? (
                     <form action={refresh}>
                       <input type="hidden" name="id" value={id} />
                       <input type="hidden" name="asaas_payment_id" value={c.asaas_payment_id} />
@@ -596,6 +633,7 @@ export default async function ServiceOrderPage({
                         Consultar no Asaas
                       </button>
                     </form>
+                    ) : null}
                   </div>
                   <div className="row">
                     {wa ? (
@@ -646,16 +684,16 @@ export default async function ServiceOrderPage({
                 </div>
               ) : null}
 
-              {open ? (
+              {open && canReceive ? (
                 <div className="row" style={{ alignItems: "flex-start" }}>
-                  {!live && r.open_cents >= ASAAS_MIN_CHARGE_CENTS ? (
+                  {!live && canCharge && r.open_cents >= ASAAS_MIN_CHARGE_CENTS ? (
                     <form action={charge}>
                       <input type="hidden" name="id" value={id} />
                       <input type="hidden" name="receivable_id" value={r.id} />
                       <button className="btn btn-primary">Gerar Pix / cobrança</button>
                     </form>
                   ) : null}
-                  {!live && r.open_cents < ASAAS_MIN_CHARGE_CENTS ? (
+                  {!live && canCharge && r.open_cents < ASAAS_MIN_CHARGE_CENTS ? (
                     <span className="muted" style={{ alignSelf: "center" }}>
                       Abaixo de {formatBRL(ASAAS_MIN_CHARGE_CENTS)} o Asaas não gera cobrança: receba na maquininha ou em dinheiro.
                     </span>
@@ -808,7 +846,7 @@ export default async function ServiceOrderPage({
                           {s.interest_cents > 0 ? <span className="muted"> + juros {formatBRL(s.interest_cents)}</span> : null}
                         </td>
                         <td>
-                          {s.source === "manual" && !s.reversed_at ? (
+                          {s.source === "manual" && !s.reversed_at && canReverse ? (
                             <form action={reverseSettlement}>
                               <input type="hidden" name="id" value={id} />
                               <input type="hidden" name="settlement_id" value={s.id} />
@@ -829,6 +867,8 @@ export default async function ServiceOrderPage({
           );
         })
       )}
+      </>
+      ) : null}
     </Shell>
   );
 }

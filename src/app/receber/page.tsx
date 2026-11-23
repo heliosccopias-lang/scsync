@@ -17,7 +17,7 @@ export default async function ReceivablesPage({
   const isDay = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
   const de = isDay(sp.de);
   const ate = isDay(sp.ate);
-  const { sb, orgId, orgName } = await requireOrg();
+  const { sb, orgId, orgName, can } = await requireOrg();
   const today = todayInSaoPaulo();
 
   const { data: customers } = await sb.from("customers").select("id, name, cpf_cnpj").eq("org_id", orgId).order("name").limit(5000);
@@ -76,7 +76,7 @@ export default async function ReceivablesPage({
     return `/receber?${p.toString()}`;
   };
   const totalOpen = rows.reduce((a, r) => a + (["open", "partial"].includes(r.status) ? Number(r.open_cents) : 0), 0);
-  const selectable = situacao !== "pago" && situacao !== "cancelado";
+  const selectable = situacao !== "pago" && situacao !== "cancelado" && can("finance.receive");
 
   return (
     <Shell orgName={orgName}>

@@ -14,7 +14,9 @@ const METHODS = ["pix", "boleto", "credit_card", "debit_card", "cash", "transfer
 export async function createTitle(form: FormData) {
   const kind = form.get("kind") === "payable" ? "payable" : "receivable";
   const path = kind === "payable" ? "/pagar" : "/receber";
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("finance.edit")) back(path, "error", "Seu perfil não lança contas.");
+  const { sb, orgId } = ctx;
   const name = String(form.get("name") ?? "").trim();
   const total = parseBRL(String(form.get("amount") ?? ""));
   const due = String(form.get("due_date") || todayInSaoPaulo());
@@ -62,7 +64,9 @@ export async function settleSelected(form: FormData) {
   if (!ids.length) back(path, "error", "Marque as contas que foram pagas.");
   const method = METHODS.includes(String(form.get("method"))) ? String(form.get("method")) : "cash";
   const paidOn = String(form.get("paid_on") || todayInSaoPaulo());
-  const { sb } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can(kind === "payable" ? "finance.edit" : "finance.receive")) back(path, "error", "Seu perfil não dá baixa nessas contas.");
+  const { sb } = ctx;
   const { data, error } = await sb.rpc("settle_batch", { p_kind: kind, p_ids: ids, p_paid_on: paidOn, p_method: method });
   if (error) back(path, "error", "Não foi possível dar baixa.");
   back(path, "ok", `${data} conta(s) baixada(s) pelo valor em aberto.`);
@@ -70,7 +74,9 @@ export async function settleSelected(form: FormData) {
 
 export async function payOne(form: FormData) {
   const path = String(form.get("return_to") || "/pagar");
-  const { sb, orgId, user } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("finance.edit")) back(path, "error", "Seu perfil não registra pagamentos.");
+  const { sb, orgId, user } = ctx;
   const { data: p } = await sb.from("payables").select("id, amount_cents, paid_cents, status").eq("id", String(form.get("id"))).eq("org_id", orgId).maybeSingle();
   if (!p || !["open", "partial"].includes(p.status)) back(path, "error", "Conta não está em aberto.");
   const open = p.amount_cents - p.paid_cents;
@@ -93,7 +99,9 @@ export async function payOne(form: FormData) {
 export async function cancelTitle(form: FormData) {
   const kind = form.get("kind") === "payable" ? "payable" : "receivable";
   const path = String(form.get("return_to") || (kind === "payable" ? "/pagar" : "/receber"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("finance.edit")) back(path, "error", "Seu perfil não cancela contas.");
+  const { sb, orgId } = ctx;
   const table = kind === "payable" ? "payables" : "receivables";
   const { data: t } = await sb
     .from(table)

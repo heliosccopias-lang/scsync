@@ -15,6 +15,11 @@ function back(id: string, key: "error" | "ok", msg: string): never {
   redirect(`${base}?${key}=${encodeURIComponent(msg)}`);
 }
 
+/** Same rules as the screen and the database: stops the action before it runs. */
+function need(ctx: { can: (p: string) => boolean }, id: string, ...anyOf: string[]) {
+  if (!anyOf.some((p) => ctx.can(p))) back(id, "error", "Seu perfil não permite esta ação.");
+}
+
 const ERRORS: Record<string, string> = {
   already_launched: "As contas desta OS já foram lançadas.",
   no_installments: "A OS não tem parcelas.",
@@ -25,7 +30,9 @@ const ERRORS: Record<string, string> = {
 
 export async function launch(form: FormData) {
   const id = String(form.get("id"));
-  const { sb } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb } = ctx;
+  need(ctx, id, "os.edit");
   const { error } = await sb.rpc("launch_accounts", { p_service_order: id });
   if (error) back(id, "error", ERRORS[error.message.split(":")[0]] ?? "Não foi possível lançar as contas.");
   back(id, "ok", "Contas lançadas em contas a receber.");
@@ -33,7 +40,9 @@ export async function launch(form: FormData) {
 
 export async function charge(form: FormData) {
   const id = String(form.get("id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "finance.receive");
   try {
     await createChargeForReceivable(sb, orgId, String(form.get("receivable_id")));
   } catch (e) {
@@ -45,7 +54,9 @@ export async function charge(form: FormData) {
 export async function refresh(form: FormData) {
   const id = String(form.get("id"));
   const paymentId = String(form.get("asaas_payment_id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "finance.receive");
   const { data: own } = await sb.from("charges").select("id").eq("org_id", orgId).eq("asaas_payment_id", paymentId).maybeSingle();
   if (!own) back(id, "error", "Cobrança não encontrada.");
   const asaas = await asaasFor(orgId);
@@ -56,7 +67,10 @@ export async function refresh(form: FormData) {
 
 export async function setStatus(form: FormData) {
   const id = String(form.get("id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "os.status", "os.edit");
+  if (String(form.get("status")) === "cancelled") need(ctx, id, "os.cancel");
   const { error } = await sb
     .from("service_orders")
     .update({ status: String(form.get("status")), updated_at: new Date().toISOString() })
@@ -71,7 +85,9 @@ export async function receiveManual(form: FormData) {
   const id = String(form.get("id"));
   const receivableId = String(form.get("receivable_id"));
   const method = String(form.get("method"));
-  const { sb, orgId, user } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId, user } = ctx;
+  need(ctx, id, "finance.receive");
 
   if (!["debit_card", "credit_card", "cash", "pix", "transfer"].includes(method)) back(id, "error", "Escolha a forma de recebimento.");
 
@@ -133,7 +149,9 @@ export async function receiveManual(form: FormData) {
 
 export async function reverseSettlement(form: FormData) {
   const id = String(form.get("id"));
-  const { sb, orgId, user } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId, user } = ctx;
+  need(ctx, id, "finance.reverse");
   const { error, count } = await sb
     .from("settlements")
     .update({ reversed_at: new Date().toISOString(), reversed_by: user.id }, { count: "exact" })
@@ -148,7 +166,9 @@ export async function reverseSettlement(form: FormData) {
 export async function updateCustomer(form: FormData) {
   const id = String(form.get("id"));
   const customerId = String(form.get("customer_id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "customers.edit");
   const name = String(form.get("name") ?? "").trim();
   const doc = onlyDigits(String(form.get("cpf_cnpj") ?? ""));
   const email = String(form.get("email") ?? "").trim() || null;
@@ -179,10 +199,27 @@ export async function updateCustomer(form: FormData) {
 /** Non-financial fields: allowed at any time, even after accounts are launched. */
 export async function updateDetails(form: FormData) {
   const id = String(form.get("id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "os.status", "os.edit");
   const s = (k: string) => String(form.get(k) ?? "").trim() || null;
   const delivery = s("delivery_date");
   const attendance = s("attendance_type");
+  if (!ctx.can("os.edit")) {
+    // Produção: only the job's progress notes and delivery date.
+    const { error } = await sb
+      .from("service_orders")
+      .update({
+        delivery_date: delivery && /^\d{4}-\d{2}-\d{2}$/.test(delivery) ? delivery : null,
+        technical_report: s("technical_report"),
+        internal_notes: s("internal_notes"),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("org_id", orgId);
+    if (error) back(id, "error", "Não foi possível salvar.");
+    back(id, "ok", "Laudo e observações atualizados.");
+  }
   const { error } = await sb
     .from("service_orders")
     .update({
@@ -204,7 +241,9 @@ export async function updateDetails(form: FormData) {
 
 export async function convertQuote(form: FormData) {
   const id = String(form.get("id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "os.edit");
   const { error, count } = await sb
     .from("service_orders")
     .update({ kind: "order", status: "approved", updated_at: new Date().toISOString() }, { count: "exact" })
@@ -217,7 +256,9 @@ export async function convertQuote(form: FormData) {
 
 export async function addChecklist(form: FormData) {
   const id = String(form.get("id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "os.status", "os.edit");
   const checklistId = String(form.get("checklist_id") ?? "");
   if (!checklistId) back(id, "error", "Escolha um checklist.");
   const { data, error } = await sb
@@ -231,7 +272,9 @@ export async function addChecklist(form: FormData) {
 
 export async function removeAttachment(form: FormData) {
   const id = String(form.get("id"));
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb, orgId } = ctx;
+  need(ctx, id, "os.edit");
   const ok = await deleteAttachment(sb, orgId, String(form.get("attachment_id")));
   if (!ok) back(id, "error", "Não foi possível remover o anexo.");
   back(id, "ok", "Anexo removido.");
@@ -240,7 +283,9 @@ export async function removeAttachment(form: FormData) {
 export async function stockAction(form: FormData) {
   const id = String(form.get("id"));
   const op = form.get("op") === "reverse" ? "reverse_stock" : "launch_stock";
-  const { sb } = await requireOrg();
+  const ctx = await requireOrg();
+  const { sb } = ctx;
+  need(ctx, id, "os.edit");
   const { data, error } = await sb.rpc(op, { p_service_order: id });
   if (error) {
     const msg: Record<string, string> = {

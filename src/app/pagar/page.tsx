@@ -11,7 +11,8 @@ export default async function PayablesPage({
   searchParams: Promise<{ situacao?: string; q?: string; de?: string; ate?: string; error?: string; ok?: string }>;
 }) {
   const { situacao = "aberto", q, de, ate, error, ok } = await searchParams;
-  const { sb, orgId, orgName } = await requireOrg();
+  const { sb, orgId, orgName, can } = await requireOrg();
+  const canEdit = can("finance.edit");
   const today = todayInSaoPaulo();
 
   let query = sb
@@ -36,7 +37,7 @@ export default async function PayablesPage({
   ]);
   const rows = data ?? [];
   const totalOpen = rows.reduce((a, r) => a + (["open", "partial"].includes(r.status) ? r.amount_cents - r.paid_cents : 0), 0);
-  const selectable = situacao !== "pago" && situacao !== "cancelado";
+  const selectable = situacao !== "pago" && situacao !== "cancelado" && canEdit;
 
   return (
     <Shell orgName={orgName}>
@@ -104,7 +105,7 @@ export default async function PayablesPage({
                     </td>
                     <td className="num">{formatBRL(isOpen ? r.amount_cents - r.paid_cents : 0)}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      {isOpen ? (
+                      {isOpen && canEdit ? (
                         <details>
                           <summary className="btn btn-secondary" style={{ padding: "3px 8px", fontSize: 12 }}>
                             Pagar…

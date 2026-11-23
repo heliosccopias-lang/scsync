@@ -5,6 +5,7 @@ import { requireOrg } from "@/lib/session";
 import { canOpen } from "@/lib/access";
 import { GRACE_DAYS } from "@/lib/plans";
 import { switchOrg } from "@/app/empresa/actions";
+import { PreviewBanner, PreviewForm } from "./PreviewControls";
 
 /** Top bar: menu filtered by the user's profile and the company's modules, company switcher, account links. */
 export async function Shell({ children }: { orgName?: string; children: React.ReactNode }) {
@@ -50,6 +51,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
             ["/os/nova", "Nova ordem de serviço"],
             ["/os/pagas", "Ordens de serviço pagas"],
           ])}
+          {ok("/vendas/nova") ? <Link href="/vendas/nova">Venda no balcão</Link> : null}
           {group("Financeiro", [
             ["/receber", "Contas a receber"],
             ["/pagar", "Contas a pagar"],
@@ -108,7 +110,24 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
           </div>
         </details>
       </header>
-      {ctx.account?.status === "past_due" ? (
+      {ctx.preview ? <PreviewBanner label={ctx.preview.label} role={ctx.preview.role} plan={ctx.preview.plan} /> : null}
+      {!ctx.preview && ctx.realOwner ? (
+        <div className="preview-cta">
+          <details className="menu-inline">
+            <summary className="btn btn-secondary" style={{ padding: "3px 10px", fontSize: 12 }}>
+              👁 Visualizar como cliente
+            </summary>
+            <div className="menu-list" style={{ right: 0, left: "auto", minWidth: 300 }}>
+              <div className="muted" style={{ fontSize: 12, margin: "2px 4px 8px" }}>
+                Escolha o perfil do usuário e o plano da gráfica para ver como as telas ficam depois das suas configurações. Nada é gravado enquanto
+                estiver visualizando.
+              </div>
+              <PreviewForm compact />
+            </div>
+          </details>
+        </div>
+      ) : null}
+      {ctx.account?.status === "past_due" && !ctx.preview ? (
         <div className="notice notice-error" style={{ margin: 0, borderRadius: 0, textAlign: "center" }}>
           A mensalidade do SCsync está em atraso; o acesso é bloqueado {GRACE_DAYS} dias após o vencimento.
           {ctx.isOwner ? (
@@ -119,7 +138,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
           ) : null}
         </div>
       ) : null}
-      {trialDays !== null && trialDays >= 0 ? (
+      {trialDays !== null && trialDays >= 0 && !ctx.preview ? (
         <div className="notice" style={{ margin: 0, borderRadius: 0, textAlign: "center", background: "var(--orange-soft)", color: "var(--orange-ink)" }}>
           Período de teste: {trialDays === 0 ? "termina hoje" : `${trialDays} dia(s) restante(s)`}.
           {ctx.isOwner ? (

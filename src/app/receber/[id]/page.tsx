@@ -14,7 +14,8 @@ import { cancelTitle } from "../actions";
 export default async function ReceivableDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; ok?: string }> }) {
   const { id } = await params;
   const { error, ok } = await searchParams;
-  const { sb, orgId, orgName } = await requireOrg();
+  const { sb, orgId, orgName, can, module: hasModule } = await requireOrg();
+  const canReceive = can("finance.receive");
   const { data: r } = await sb
     .from("receivables_view")
     .select("*, customers(name, phone, cpf_cnpj), financial_categories(name)")
@@ -71,7 +72,7 @@ export default async function ReceivableDetail({ params, searchParams }: { param
           <Link href={`/os/${r.origin_id}`} className="btn btn-secondary">
             Ver OS
           </Link>
-        ) : open && r.paid_cents === 0 ? (
+        ) : open && r.paid_cents === 0 && can("finance.edit") ? (
           <form action={cancelTitle}>
             <input type="hidden" name="kind" value="receivable" />
             <input type="hidden" name="id" value={id} />
@@ -113,6 +114,7 @@ export default async function ReceivableDetail({ params, searchParams }: { param
         <div className="notice" style={{ background: "var(--orange-soft)", color: "var(--ink)" }}>
           <div className="spread" style={{ marginBottom: 6 }}>
             <strong>Cobrança Asaas: {c.status}</strong>
+            {canReceive ? (
             <form action={refresh}>
               <input type="hidden" name="id" value={self} />
               <input type="hidden" name="asaas_payment_id" value={c.asaas_payment_id} />
@@ -120,6 +122,7 @@ export default async function ReceivableDetail({ params, searchParams }: { param
                 Consultar no Asaas
               </button>
             </form>
+            ) : null}
           </div>
           <div className="row">
             {wa ? (
@@ -150,9 +153,9 @@ export default async function ReceivableDetail({ params, searchParams }: { param
         </div>
       ) : null}
 
-      {open ? (
+      {open && canReceive ? (
         <div className="row" style={{ alignItems: "flex-start", marginBottom: 12 }}>
-          {!live && r.open_cents >= ASAAS_MIN_CHARGE_CENTS ? (
+          {!live && hasModule("asaas") && r.open_cents >= ASAAS_MIN_CHARGE_CENTS ? (
             <form action={charge}>
               <input type="hidden" name="id" value={self} />
               <input type="hidden" name="receivable_id" value={id} />
@@ -227,7 +230,7 @@ export default async function ReceivableDetail({ params, searchParams }: { param
                     {s.interest_cents > 0 ? <span className="muted"> + juros {formatBRL(s.interest_cents)}</span> : null}
                   </td>
                   <td>
-                    {["manual", "batch"].includes(s.source) && !s.reversed_at ? (
+                    {["manual", "batch"].includes(s.source) && !s.reversed_at && can("finance.reverse") ? (
                       <form action={reverseSettlement}>
                         <input type="hidden" name="id" value={self} />
                         <input type="hidden" name="settlement_id" value={s.id} />

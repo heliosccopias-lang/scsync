@@ -11,7 +11,9 @@ function back(key: "error" | "ok", msg: string): never {
 
 async function save(form: FormData) {
   "use server";
-  const { sb, orgId } = await requireOrg();
+  const ctx = await requireOrg();
+  if (!ctx.can("customers.edit")) back("error", "Seu perfil não altera clientes.");
+  const { sb, orgId } = ctx;
   const id = String(form.get("id") ?? "");
   const name = String(form.get("name") ?? "").trim();
   const doc = onlyDigits(String(form.get("cpf_cnpj") ?? ""));
@@ -40,7 +42,8 @@ async function save(form: FormData) {
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; error?: string; ok?: string }> }) {
   const { q, error, ok } = await searchParams;
-  const { sb, orgId, orgName } = await requireOrg();
+  const { sb, orgId, orgName, can } = await requireOrg();
+  const canEdit = can("customers.edit");
   let query = sb.from("customers").select("id, name, cpf_cnpj, phone, email, address").eq("org_id", orgId).order("name").limit(300);
   if (q) query = /^\d+$/.test(onlyDigits(q)) && onlyDigits(q).length >= 3 ? query.ilike("cpf_cnpj", `%${onlyDigits(q)}%`) : query.ilike("name", `%${q}%`);
   const { data: customers } = await query;
@@ -55,6 +58,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         </form>
       </div>
       <Notice error={error} ok={ok} />
+      {canEdit ? (
       <details className="card" style={{ marginBottom: 16 }}>
         <summary className="btn btn-primary" style={{ display: "inline-flex" }}>
           Novo cliente
@@ -96,6 +100,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <button className="btn btn-primary">Salvar cliente</button>
         </form>
       </details>
+      ) : null}
       {(customers ?? []).length === 0 ? (
         <div className="card empty">Nenhum cliente encontrado.</div>
       ) : (
@@ -120,6 +125,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       <span>{c.phone ?? "—"}</span>
                       <span>{c.email ?? "—"}</span>
                     </summary>
+                    {canEdit ? (
                     <form action={save} className="row" style={{ padding: "0 12px 12px", flexWrap: "nowrap" }}>
                       <input type="hidden" name="id" value={c.id} />
                       <input name="name" defaultValue={c.name} aria-label="Nome" style={{ flex: 2 }} required />
@@ -131,6 +137,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       <input name="addr_complement" defaultValue={(c.address as { complement?: string })?.complement ?? ""} aria-label="Complemento" placeholder="Compl." style={{ width: 90 }} />
                       <button className="btn btn-secondary">Salvar</button>
                     </form>
+                    ) : null}
                   </details>
                 </td>
                 <td>

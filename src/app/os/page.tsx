@@ -9,16 +9,19 @@ type Row = {
   status: string;
   os_date: string;
   total_cents: number;
+  channel: string;
   customers: { name: string } | null;
 };
 
 export default async function ServiceOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; cliente?: string }> }) {
-  const { sb, orgId, orgName } = await requireOrg();
+  const { sb, orgId, orgName, can } = await requireOrg();
+  const canEdit = can("os.edit");
+  const canPrice = can("prices.view");
   const { q, status, cliente } = await searchParams;
 
   let query = sb
     .from("service_orders")
-    .select("id, number, status, os_date, total_cents, customers(name)")
+    .select("id, number, status, os_date, total_cents, channel, customers(name)")
     .eq("org_id", orgId)
     .order("number", { ascending: false })
     .limit(100);
@@ -40,9 +43,11 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
     <Shell orgName={orgName}>
       <div className="spread">
         <h1 style={{ margin: 0 }}>Ordens de serviço</h1>
-        <Link className="btn btn-primary" href="/os/nova">
-          Nova ordem de serviço
-        </Link>
+        {canEdit ? (
+          <Link className="btn btn-primary" href="/os/nova">
+            Nova ordem de serviço
+          </Link>
+        ) : null}
       </div>
       <form className="row" style={{ marginBottom: 16 }}>
         <input name="q" placeholder="Nº da OS ou cliente" defaultValue={q} style={{ maxWidth: 280 }} />
@@ -58,7 +63,7 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
       </form>
       {rows.length === 0 ? (
         <div className="card empty">
-          Nenhuma ordem de serviço ainda. <Link href="/os/nova">Crie a primeira</Link>.
+          Nenhuma ordem de serviço ainda.{canEdit ? <> <Link href="/os/nova">Crie a primeira</Link>.</> : null}
         </div>
       ) : (
         <table>
@@ -78,14 +83,13 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
               <tr key={r.id}>
                 <td>
                   <Link href={`/os/${r.id}`}>#{r.number}</Link>
+                  {r.channel === "counter" ? <span className="tag-counter">Balcão</span> : null}
                 </td>
                 <td>{r.customers?.name}</td>
                 <td>{new Date(r.os_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
                 <td>{osStatusLabel(r.status)}</td>
-                <td>
-                  <PaymentPill status={payBy.get(r.id) ?? "not_billed"} />
-                </td>
-                <td className="num">{formatBRL(r.total_cents)}</td>
+                <td>{canPrice ? <PaymentPill status={payBy.get(r.id) ?? "not_billed"} /> : null}</td>
+                <td className="num">{canPrice ? formatBRL(r.total_cents) : ""}</td>
                 <td>
                   <Link href={`/os/${r.id}/imprimir`} aria-label={`Imprimir OS ${r.number}`}>
                     Imprimir
