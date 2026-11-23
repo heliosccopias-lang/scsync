@@ -50,9 +50,13 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
   return (
     <article className="sheet">
       <header className="sheet-head">
-        <div>
-          <div className="company">{org.name}</div>
-          {org.cnpj ? <div className="muted">CNPJ {org.cnpj}</div> : null}
+        <div className="sheet-brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="sheet-logo" src="/brand/scsync-logo-compact.svg" alt="SCsync" />
+          <div>
+            <div className="company">{org.name}</div>
+            {org.cnpj ? <div className="muted">CNPJ {org.cnpj}</div> : null}
+          </div>
         </div>
         <div className="doc-id">
           <div className="doc-title">{title}</div>
@@ -246,10 +250,6 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
           {production ? "Conferido por" : c?.name}
         </div>
       </footer>
-      <div className="made-with">
-        Emitido com {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/scsync-mono.svg" alt="SCsync" />
-      </div>
     </article>
   );
 }

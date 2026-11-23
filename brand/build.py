@@ -47,3 +47,22 @@ out["scsync-mono.svg"]=svg(xend+6, 64, g(0.8,-2,6.4, mark("#000000", "#000000", 
 os.makedirs("/tmp/logo/out", exist_ok=True)
 for k,v in out.items(): open(f"/tmp/logo/out/{k}","w").write(v)
 print(list(out))
+
+# Compact stacked (same layout, name bigger relative to the symbol): for small heights (top bar, headers, print)
+def stacked_compact(sc, syncc, scolor, ocolor, title):
+    size=50
+    wm, xend = wordmark(0, 0, size, sc, syncc)
+    W=xend+8
+    scale=2.0
+    # symbol drawing spans about x 6..58 and y 12..48 in its 64-unit box
+    mx=(W-52*scale)/2-6*scale; my=-12*scale+2
+    body=g(scale, mx, my, mark(scolor, ocolor))
+    base=36*scale+2+size*0.95
+    body+=f'<g transform="translate({(W-xend)/2:.2f} 0)">{wordmark(0, base, size, sc, syncc)[0]}</g>'
+    return svg(W, base+size*0.12, body, title)
+for name, args in {
+    "scsync-logo-compact.svg": (INK, OR, INK, OR),
+    "scsync-logo-compact-dark.svg": (WHITE, OR, WHITE, OR),
+    "scsync-logo-compact-mono.svg": ("#000000", "#000000", "#000000", "#000000"),
+}.items():
+    open(f"/tmp/logo/out/{name}","w").write(stacked_compact(*args, "SCsync"))

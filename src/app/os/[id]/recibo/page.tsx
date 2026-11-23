@@ -44,9 +44,13 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
       </div>
       <article className="sheet" style={{ minHeight: "auto" }}>
         <header className="sheet-head">
-          <div>
-            <div className="company">{org.name}</div>
-            {org.cnpj ? <div className="muted">CNPJ {org.cnpj}</div> : null}
+          <div className="sheet-brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="sheet-logo" src="/brand/scsync-logo-compact.svg" alt="SCsync" />
+            <div>
+              <div className="company">{org.name}</div>
+              {org.cnpj ? <div className="muted">CNPJ {org.cnpj}</div> : null}
+            </div>
           </div>
           <div className="doc-id">
             <div className="doc-title">RECIBO</div>
@@ -104,10 +108,6 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
             {org.name}
           </div>
         </footer>
-        <div className="made-with">
-          Emitido com {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/scsync-mono.svg" alt="SCsync" />
-        </div>
       </article>
     </div>
   );

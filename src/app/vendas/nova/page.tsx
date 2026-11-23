@@ -16,7 +16,11 @@ export default async function CounterSalePage() {
   const items = (catalog ?? []).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "product" ? -1 : 1));
   return (
     <Shell orgName={orgName}>
-      <h1>Venda no balcão</h1>
+      <div className="page-brand">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/scsync-logo-compact.svg" alt="SCsync" />
+        <h1 style={{ margin: 0 }}>Venda no balcão</h1>
+      </div>
       <p className="muted" style={{ marginTop: -6 }}>
         Para vender produtos na hora (papel, tinta, envelope, agenda, caneta…). A venda baixa o estoque, entra em contas a receber e aparece em
         Ordens de serviço com a marca <span className="tag-counter">Balcão</span>.

@@ -23,7 +23,7 @@
 html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.5; }
 a { color: var(--orange-ink); }
 
-.topbar { background: var(--ink); color: var(--paper); display: flex; align-items: center; gap: 24px; padding: 0 24px; height: 56px; }
+.topbar { background: var(--ink); color: var(--paper); display: flex; align-items: center; gap: 24px; padding: 0 24px; height: 72px; }
 .topbar .brand { font-weight: 700; letter-spacing: .2px; }
 .topbar .brand span { color: var(--orange); }
 .topbar nav { display: flex; gap: 18px; flex: 1; }
@@ -97,7 +97,7 @@ details > summary.btn::-webkit-details-marker { display: none; }
 .lp-wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 .lp-narrow { max-width: 760px; }
 .lp-top { background: var(--ink); position: sticky; top: 0; z-index: 10; }
-.lp-top-in { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+.lp-top-in { display: flex; align-items: center; justify-content: space-between; height: 76px; }
 .lp-brand { color: var(--paper); font-weight: 800; font-size: 20px; }
 .lp-brand span, .lp-foot span { color: var(--orange); }
 .lp-top nav { display: flex; gap: 22px; }
@@ -146,7 +146,7 @@ details > summary.btn::-webkit-details-marker { display: none; }
 .nav-burger { display: none; cursor: pointer; flex-direction: column; justify-content: center; gap: 4px; padding: 8px; margin: 0; }
 .nav-burger span { display: block; width: 22px; height: 2px; border-radius: 2px; background: #e9e4dc; }
 @media (max-width: 900px) {
-  .topbar { flex-wrap: wrap; height: auto; min-height: 56px; padding: 6px 12px; gap: 8px 12px; position: relative; }
+  .topbar { flex-wrap: wrap; height: auto; min-height: 64px; padding: 6px 12px; gap: 8px 12px; position: relative; }
   .topbar .brand { order: 1; }
   .topbar .org { order: 2; margin-left: auto; font-size: 12px; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topbar .usermenu { order: 3; }
@@ -195,9 +195,12 @@ details > summary.btn::-webkit-details-marker { display: none; }
 
 /* Brand (logo files in /public/brand) */
 .topbar .brand { display: flex; align-items: center; }
-.topbar .brand img { display: block; height: 30px; width: auto; }
+.topbar .brand img { display: block; height: 54px; width: auto; }
 .lp-brand { display: flex; align-items: center; }
-.lp-brand img { display: block; height: 34px; width: auto; }
+.lp-brand img { display: block; height: 56px; width: auto; }
 .lp-hero-in { display: flex; align-items: center; gap: 48px; }
 .lp-hero-logo { width: 220px; height: auto; flex-shrink: 0; }
 @media (max-width: 760px) { .lp-hero-in { flex-direction: column; align-items: flex-start; gap: 24px; } .lp-hero-logo { width: 150px; } }
+@media (max-width: 900px) { .topbar .brand img { height: 46px; } }
+.page-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.page-brand img { height: 56px; width: auto; display: block; }

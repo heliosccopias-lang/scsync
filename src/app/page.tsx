@@ -37,7 +37,7 @@ function Landing() {
         <div className="lp-wrap lp-top-in">
           <Link href="/" className="lp-brand" aria-label="SCsync">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/scsync-horizontal-dark.svg" alt="SCsync" height={34} />
+            <img src="/brand/scsync-logo-compact-dark.svg" alt="SCsync" height={56} />
           </Link>
           <nav>
             <a href="#recursos">Recursos</a>
@@ -146,7 +146,7 @@ function Landing() {
       <footer className="lp-foot">
         <div className="lp-wrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/scsync-horizontal.svg" alt="SCsync" height={24} /> · gestão para gráficas
+          <img src="/brand/scsync-logo-compact.svg" alt="SCsync" height={48} /> · gestão para gráficas
         </div>
       </footer>
     </div>

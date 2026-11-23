@@ -10,11 +10,15 @@ FONTE DO NOME
   Poppins (SC em Bold, "sync" em SemiBold). Nos arquivos as letras já estão convertidas em desenho:
   não é preciso ter a fonte instalada.
 
-QUAL ARQUIVO USAR
-  scsync-logo ............ completa (SC em cima, SCsync embaixo) para fundo claro
+QUAL ARQUIVO USAR (padrão: SC em cima, SCsync embaixo)
+  scsync-logo-compact .... SC em cima e SCsync embaixo, com o nome maior: a versão de uso diário
+                           (topo do sistema, cabeçalho da OS e do recibo, documentos, assinatura de e-mail)
+  scsync-logo-compact-dark  a mesma para fundo escuro
+  scsync-logo-compact-mono  a mesma só em preto
+  scsync-logo ............ completa (SC grande em cima, SCsync embaixo) para fundo claro: login, capas, banners
   scsync-logo-dark ....... completa para fundo escuro (letras brancas)
   scsync-logo-mono ....... completa só em preto (carimbo, impressão P&B, gravação)
-  scsync-horizontal ...... símbolo ao lado do nome, para fundo claro (cabeçalhos, assinatura de e-mail)
+  scsync-horizontal ...... símbolo ao lado do nome (alternativa, só onde não couber a versão empilhada)
   scsync-horizontal-dark . símbolo ao lado do nome, para fundo escuro
   scsync-mono ............ horizontal só em preto (recibos, notas, documentos P&B)
   scsync-mark ............ só o símbolo SC

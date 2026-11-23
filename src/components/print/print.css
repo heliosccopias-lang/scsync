@@ -34,5 +34,6 @@
   .sheet { box-shadow: none; margin: 0; width: auto; min-height: auto; }
   .sheet table, .sheet tr { break-inside: avoid; }
 }
-.made-with { margin-top: 14px; display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 9px; color: #777; }
-.made-with img { height: 11px; width: auto; filter: grayscale(1); opacity: .7; }
+.sheet-brand { display: flex; align-items: center; gap: 14px; }
+.sheet-logo { height: 64px; width: auto; display: block; }
+@media print { .sheet-logo { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

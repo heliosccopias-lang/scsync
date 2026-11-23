@@ -32,10 +32,14 @@ export default async function PrintChecklist({ params }: { params: Promise<{ id:
       </div>
       <article className="sheet">
         <header className="sheet-head">
-          <div>
-            <div className="company">{os.orgs.name}</div>
-            <div className="muted">
-              {os.customers.name}
+          <div className="sheet-brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="sheet-logo" src="/brand/scsync-logo-compact.svg" alt="SCsync" />
+            <div>
+              <div className="company">{os.orgs.name}</div>
+              <div className="muted">
+                {os.customers.name}
+              </div>
             </div>
           </div>
           <div className="doc-id">
@@ -76,10 +80,6 @@ export default async function PrintChecklist({ params }: { params: Promise<{ id:
             Data
           </div>
         </footer>
-        <div className="made-with">
-          Emitido com {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/scsync-mono.svg" alt="SCsync" />
-        </div>
       </article>
     </div>
   );
