@@ -320,3 +320,5 @@ details.popover > .popover-panel { right: 0; padding-top: 28px; box-shadow: 0 10
   font-size: 16px; line-height: 1; cursor: pointer; color: var(--muted, #777); padding: 4px;
 }
 .popover-close:hover { color: inherit; }
+.notice-warn { background: #fff4e5; color: #8a4b0f; border: 1px solid #f3c58f; }
+.linklike { background: none; border: 0; padding: 0; color: var(--accent, #E8834A); font-weight: 600; text-decoration: underline; cursor: pointer; font: inherit; }
