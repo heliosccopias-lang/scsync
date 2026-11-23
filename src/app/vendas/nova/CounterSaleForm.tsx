@@ -36,7 +36,7 @@ export function CounterSaleForm({
   const [lineTotals, setLineTotals] = useState<number[]>(() => Array(SALE_LINES).fill(0));
   const [method, setMethod] = useState(v.method ?? (canReceive ? "cash" : "later"));
   const [condition, setCondition] = useState(v.condition_id ?? "");
-  // Visible item lines: 4 to start, more on demand (and enough to show what came back from a failed save).
+  // Visible item lines: 3 to start, more on demand (and enough to show what came back from a failed save).
   const filled = Array.from({ length: SALE_LINES }, (_, i) => i).filter((i) => v[`item_desc_${i}`] || v[`item_qty_${i}`] || v[`item_price_${i}`]);
   const [lines, setLines] = useState(Math.max(SALE_START_LINES, filled.length ? filled[filled.length - 1] + 1 : 0));
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
