@@ -5,6 +5,7 @@ export function EditButton({ id }: { id: string }) {
   return (
     <button
       type="button"
+      data-opens={`edit-${id}`}
       className="btn btn-secondary"
       style={{ padding: "3px 8px", fontSize: 12 }}
       onClick={() => {

@@ -10,7 +10,7 @@ import { useEffect } from "react";
  */
 export function MenuCloser() {
   useEffect(() => {
-    const menus = () => Array.from(document.querySelectorAll<HTMLDetailsElement>(".topbar details.menu[open], details.menu-inline[open], details.popover[open]"));
+    const menus = () => Array.from(document.querySelectorAll<HTMLDetailsElement>(".topbar details.menu[open], details.menu-inline[open], details.popover[open], details.inline-edit[open]"));
     const onClick = (e: MouseEvent) => {
       const target = e.target as Element | null;
       // Mobile: picking a screen closes the menu panel.
@@ -19,9 +19,10 @@ export function MenuCloser() {
         if (t) t.checked = false;
       }
       for (const m of menus()) {
-        const inside = !!target && m.contains(target);
+        // A button elsewhere that opens this panel (data-opens="<details id>") counts as inside.
+        const inside = !!target && (m.contains(target) || (!!m.id && !!target.closest(`[data-opens="${m.id}"]`)));
         // Picking a menu item, the ✕ button or a form's submit button (Registrar pagamento) closes it too.
-        const pickedItem = inside && !!target?.closest(".menu-list a, [data-close], details.popover button:not([type=button])");
+        const pickedItem = inside && !!target?.closest(".menu-list a, [data-close], details.popover button:not([type=button]), details.inline-edit button:not([type=button])");
         if (!inside || pickedItem) m.open = false;
       }
     };

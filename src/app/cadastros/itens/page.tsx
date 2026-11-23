@@ -208,7 +208,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             {(items ?? []).map((it) => (
               <tr key={it.id} style={it.active ? undefined : { opacity: 0.55 }}>
                 <td colSpan={3} style={{ padding: 0 }}>
-                  <details id={`edit-${it.id}`}>
+                  <details id={`edit-${it.id}`} className="inline-edit">
                     <summary style={{ display: "grid", gridTemplateColumns: "1fr 90px 140px", padding: "10px 12px", cursor: "pointer" }}>
                       <span>
                         {it.code ? <span className="muted" style={{ marginRight: 8 }}>{it.code}</span> : null}
