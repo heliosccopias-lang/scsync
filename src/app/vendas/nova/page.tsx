@@ -33,6 +33,7 @@ export default async function CounterSalePage() {
         attendants={(technicians ?? []).map((t) => ({ id: t.id, name: t.name }))}
         defaultAttendant={me}
         canManageAttendants={can("settings")}
+        canAddCustomer={can("customers.edit")}
         conditions={conditions ?? []}
       />
     </Shell>

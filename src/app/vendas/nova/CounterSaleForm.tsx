@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState, type FormEvent } from "react";
-import { createSale, type SaleState } from "./actions";
+import { useActionState, useRef, useState, useTransition, type FormEvent } from "react";
+import { createSale, quickCustomer, type SaleState } from "./actions";
 import { SALE_LINES, SALE_START_LINES } from "./constants";
 import type { CatalogEntry } from "@/app/os/nova/NewOrderForm";
 import { parseQuantity } from "@/lib/money";
@@ -21,6 +21,7 @@ export function CounterSaleForm({
   defaultAttendant,
   canManageAttendants,
   conditions = [],
+  canAddCustomer = false,
 }: {
   catalog: CatalogEntry[];
   customers: { id: string; name: string }[];
@@ -29,6 +30,7 @@ export function CounterSaleForm({
   defaultAttendant: string;
   canManageAttendants: boolean;
   conditions?: { id: string; name: string }[];
+  canAddCustomer?: boolean;
 }) {
   const [state, action, pending] = useActionState<SaleState, FormData>(createSale, {});
   const v = state.values ?? {};
@@ -39,6 +41,24 @@ export function CounterSaleForm({
   // Visible item lines: 3 to start, more on demand (and enough to show what came back from a failed save).
   const filled = Array.from({ length: SALE_LINES }, (_, i) => i).filter((i) => v[`item_desc_${i}`] || v[`item_qty_${i}`] || v[`item_price_${i}`]);
   const [lines, setLines] = useState(Math.max(SALE_START_LINES, filled.length ? filled[filled.length - 1] + 1 : 0));
+  // Quick "+ Novo cliente": saved right away and picked in the customer field.
+  const [customerList, setCustomerList] = useState(customers);
+  const [customerId, setCustomerId] = useState(v.customer_id ?? "");
+  const [newCust, setNewCust] = useState({ name: "", cpf_cnpj: "", phone: "", email: "" });
+  const [custError, setCustError] = useState("");
+  const [savingCust, startSaving] = useTransition();
+  const newCustBox = useRef<HTMLDetailsElement>(null);
+  function saveCustomer() {
+    setCustError("");
+    startSaving(async () => {
+      const r = await quickCustomer(newCust);
+      if (r.error || !r.id) return setCustError(r.error ?? "Não foi possível cadastrar o cliente.");
+      setCustomerList((l) => [...l, { id: r.id!, name: r.name! }].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")));
+      setCustomerId(r.id);
+      setNewCust({ name: "", cpf_cnpj: "", phone: "", email: "" });
+      if (newCustBox.current) newCustBox.current.open = false;
+    });
+  }
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
 
   function onInput(e: FormEvent<HTMLFormElement>) {
@@ -89,15 +109,58 @@ export function CounterSaleForm({
         <div className="row" style={{ alignItems: "flex-end", gap: 12 }}>
           <div className="field" style={{ flex: 1, minWidth: 240, maxWidth: 420 }}>
             <label htmlFor="customer_id">Cliente (opcional)</label>
-            <select id="customer_id" name="customer_id" defaultValue={v.customer_id ?? ""}>
+            <select id="customer_id" name="customer_id" value={customerId} onChange={(e) => setCustomerId(e.currentTarget.value)}>
               <option value="">Consumidor final</option>
-              {customers.map((c) => (
+              {customerList.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
           </div>
+          {canAddCustomer ? (
+            <details className="popover" ref={newCustBox} style={{ marginBottom: 16 }}>
+              <summary className="btn btn-secondary">+ Novo cliente</summary>
+              <div
+                className="card popover-panel"
+                style={{ position: "absolute", zIndex: 5, width: 340, textAlign: "left" }}
+                onKeyDown={(e) => {
+                  // Enter saves the customer instead of submitting the sale.
+                  if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") {
+                    e.preventDefault();
+                    saveCustomer();
+                  }
+                }}
+              >
+                <button type="button" className="popover-close" data-close aria-label="Fechar">✕</button>
+                <strong>Novo cliente</strong>
+                {custError ? (
+                  <div className="notice notice-error" role="alert" style={{ marginTop: 8 }}>
+                    {custError}
+                  </div>
+                ) : null}
+                <div className="field" style={{ marginTop: 8 }}>
+                  <label htmlFor="nc_name">Nome *</label>
+                  <input id="nc_name" value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.currentTarget.value })} autoComplete="off" />
+                </div>
+                <div className="field">
+                  <label htmlFor="nc_doc">CPF ou CNPJ</label>
+                  <input id="nc_doc" inputMode="numeric" value={newCust.cpf_cnpj} onChange={(e) => setNewCust({ ...newCust, cpf_cnpj: e.currentTarget.value })} autoComplete="off" />
+                </div>
+                <div className="field">
+                  <label htmlFor="nc_phone">Telefone / WhatsApp</label>
+                  <input id="nc_phone" inputMode="tel" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.currentTarget.value })} autoComplete="off" />
+                </div>
+                <div className="field">
+                  <label htmlFor="nc_email">E-mail</label>
+                  <input id="nc_email" type="email" value={newCust.email} onChange={(e) => setNewCust({ ...newCust, email: e.currentTarget.value })} autoComplete="off" />
+                </div>
+                <button type="button" className="btn btn-primary" onClick={saveCustomer} disabled={savingCust}>
+                  {savingCust ? "Salvando…" : "Cadastrar e usar na venda"}
+                </button>
+              </div>
+            </details>
+          ) : null}
           <div className="field attendant-field" style={{ flex: 1, minWidth: 240, maxWidth: 360 }}>
             <label htmlFor="technician_id">
               <span className="attendant-icon" aria-hidden="true">

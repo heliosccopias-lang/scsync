@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { parseItemRows } from "@/lib/items";
 import { parseBRL, todayInSaoPaulo } from "@/lib/money";
+import { isValidCpfCnpj, onlyDigits } from "@/lib/br";
 import { requireOrg } from "@/lib/session";
 import { SALE_LINES } from "./constants";
 
@@ -102,4 +103,23 @@ export async function createSale(_prev: SaleState, form: FormData): Promise<Sale
   // Paid now or on credit: straight to the receipt, print dialog open. Charged later: the sale page, to create the Pix/boleto first.
   if (payNow || how === "term") redirect(`/os/${id}/cupom?auto=1`);
   redirect(`/os/${id}?ok=${encodeURIComponent(ok)}`);
+}
+
+/** Quick customer sign-up from the counter sale (name required; CPF/CNPJ, phone and e-mail optional). */
+export async function quickCustomer(input: { name: string; cpf_cnpj?: string; phone?: string; email?: string }): Promise<{ id?: string; name?: string; error?: string }> {
+  const ctx = await requireOrg();
+  if (!ctx.can("customers.edit")) return { error: "Seu perfil não cadastra clientes." };
+  const name = (input.name ?? "").trim().slice(0, 200);
+  const doc = onlyDigits(input.cpf_cnpj ?? "");
+  if (!name) return { error: "Informe o nome do cliente." };
+  if (doc && !isValidCpfCnpj(doc)) return { error: "CPF/CNPJ inválido. Confira os números." };
+  const email = (input.email ?? "").trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail inválido." };
+  const { data, error } = await ctx.sb
+    .from("customers")
+    .insert({ org_id: ctx.orgId, name, cpf_cnpj: doc || null, phone: (input.phone ?? "").trim() || null, email: email || null })
+    .select("id, name")
+    .single();
+  if (error || !data) return { error: error?.code === "23505" ? "Já existe um cliente com este CPF/CNPJ." : "Não foi possível cadastrar o cliente." };
+  return { id: data.id, name: data.name };
 }
