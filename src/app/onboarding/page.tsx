@@ -23,6 +23,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const { error } = await searchParams;
   return (
     <main style={{ maxWidth: 520, paddingTop: 60 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/scsync-logo.svg" alt="SCsync" height={96} style={{ display: "block", margin: "0 auto 12px" }} />
       <h1>Bem-vindo ao SCsync</h1>
       <p className="muted">Teste grátis por 14 dias. Você será o Dono da conta: cria as empresas, liga os módulos e cadastra a equipe.</p>
       <Notice error={error} />

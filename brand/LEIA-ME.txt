@@ -1,0 +1,34 @@
+SCsync — logotipo oficial (versão aprovada em 22/11/2026, opção 2 "Nome bicolor")
+
+CORES
+  Preto suave  #2B2A28   RGB 43 42 40
+  Laranja      #E8834A   RGB 232 131 74
+  Branco       #FFFFFF
+  (Para gráfica em CMYK, peça a conversão do laranja na prova de cor; referência aproximada C0 M55 Y75 K0.)
+
+FONTE DO NOME
+  Poppins (SC em Bold, "sync" em SemiBold). Nos arquivos as letras já estão convertidas em desenho:
+  não é preciso ter a fonte instalada.
+
+QUAL ARQUIVO USAR
+  scsync-logo ............ completa (SC em cima, SCsync embaixo) para fundo claro
+  scsync-logo-dark ....... completa para fundo escuro (letras brancas)
+  scsync-logo-mono ....... completa só em preto (carimbo, impressão P&B, gravação)
+  scsync-horizontal ...... símbolo ao lado do nome, para fundo claro (cabeçalhos, assinatura de e-mail)
+  scsync-horizontal-dark . símbolo ao lado do nome, para fundo escuro
+  scsync-mono ............ horizontal só em preto (recibos, notas, documentos P&B)
+  scsync-mark ............ só o símbolo SC
+  scsync-icon ............ símbolo num quadrado arredondado escuro (ícone de app, aba do navegador)
+
+PASTAS
+  vetor-SVG ............ originais vetoriais: escala infinita, para sites, designers e gráficas
+  PDF-impressao ........ vetoriais em PDF, para enviar à gráfica (banner, adesivo, fachada, cartão)
+  PNG-alta-resolucao ... 4000 px de largura, fundo transparente (apresentações, redes, vídeos)
+  PNG-com-fundo ........ 4000 px já com fundo branco ou preto (quando o programa não aceita transparência)
+  icones ............... favicon, ícones de 16 a 1024 px e imagem quadrada para perfil de redes sociais
+
+CUIDADOS
+  - Não esticar, girar, mudar as cores nem colocar sombra.
+  - Deixar em volta um espaço livre de pelo menos a altura do "S".
+  - Tamanho mínimo: símbolo com 16 px na tela ou 8 mm impresso; versão completa com 25 mm de largura.
+  - Em fundos coloridos ou fotos, usar a versão branca (dark) ou a só preto, a que tiver mais contraste.

@@ -35,9 +35,10 @@ function Landing() {
     <div className="lp">
       <header className="lp-top">
         <div className="lp-wrap lp-top-in">
-          <div className="lp-brand">
-            SC<span>sync</span>
-          </div>
+          <Link href="/" className="lp-brand" aria-label="SCsync">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/scsync-horizontal-dark.svg" alt="SCsync" height={34} />
+          </Link>
           <nav>
             <a href="#recursos">Recursos</a>
             <a href="#planos">Planos</a>
@@ -48,7 +49,10 @@ function Landing() {
       </header>
 
       <section className="lp-hero">
-        <div className="lp-wrap">
+        <div className="lp-wrap lp-hero-in">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="lp-hero-logo" src="/brand/scsync-logo-dark.svg" alt="" aria-hidden="true" />
+          <div>
           <p className="lp-kicker">Para gráficas rápidas e digitais</p>
           <h1>Da ordem de serviço ao dinheiro na conta, sem planilha.</h1>
           <p className="lp-lead">
@@ -64,6 +68,7 @@ function Landing() {
             </a>
           </div>
           <p className="lp-note">Sem cartão de crédito para começar.</p>
+          </div>
         </div>
       </section>
 
@@ -139,8 +144,9 @@ function Landing() {
       </section>
 
       <footer className="lp-foot">
-        <div className="lp-wrap">
-          SC<span>sync</span> · gestão para gráficas
+        <div className="lp-wrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/scsync-horizontal.svg" alt="SCsync" height={24} /> · gestão para gráficas
         </div>
       </footer>
     </div>

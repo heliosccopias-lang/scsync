@@ -246,6 +246,10 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
           {production ? "Conferido por" : c?.name}
         </div>
       </footer>
+      <div className="made-with">
+        Emitido com {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/scsync-mono.svg" alt="SCsync" />
+      </div>
     </article>
   );
 }

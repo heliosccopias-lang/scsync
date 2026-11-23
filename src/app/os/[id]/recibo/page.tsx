@@ -104,6 +104,10 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
             {org.name}
           </div>
         </footer>
+        <div className="made-with">
+          Emitido com {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/scsync-mono.svg" alt="SCsync" />
+        </div>
       </article>
     </div>
   );

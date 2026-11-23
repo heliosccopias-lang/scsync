@@ -192,3 +192,12 @@ details > summary.btn::-webkit-details-marker { display: none; }
 @media (max-width: 700px) { .sale-table col:nth-child(3), .sale-table col:nth-child(4) { width: 110px !important; } .sale-table col:nth-child(2) { width: 64px !important; } }
 .attendant-field label { display: flex; align-items: center; gap: 6px; }
 .attendant-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--orange-soft); color: var(--orange-ink); }
+
+/* Brand (logo files in /public/brand) */
+.topbar .brand { display: flex; align-items: center; }
+.topbar .brand img { display: block; height: 30px; width: auto; }
+.lp-brand { display: flex; align-items: center; }
+.lp-brand img { display: block; height: 34px; width: auto; }
+.lp-hero-in { display: flex; align-items: center; gap: 48px; }
+.lp-hero-logo { width: 220px; height: auto; flex-shrink: 0; }
+@media (max-width: 760px) { .lp-hero-in { flex-direction: column; align-items: flex-start; gap: 24px; } .lp-hero-logo { width: 150px; } }
