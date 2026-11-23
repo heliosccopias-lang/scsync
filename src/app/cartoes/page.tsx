@@ -73,7 +73,8 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
         <Notice error={error} ok={ok} />
         <div className="card empty">
           Cadastre primeiro o cartão em <Link href="/configuracoes/cartoes">Configurações → Cartões de crédito</Link>. Para lançar despesas pelo WhatsApp, configure
-          também o <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link>.
+          também o <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link>. Para testar sem nada configurado, use o{" "}
+          <Link href="/cartoes/simulador">simulador do robô</Link>.
         </div>
       </Shell>
     );
@@ -106,7 +107,7 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
         <h1 style={{ margin: 0 }}>Conciliação de cartão de crédito</h1>
         <span className="muted">
           <Link href="/configuracoes/cartoes">Cartões</Link> · <Link href="/configuracoes/conexoes">Conexões (API e automático)</Link> ·{" "}
-          <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link>
+          <Link href="/configuracoes/whatsapp">Robô de WhatsApp</Link> · <Link href="/cartoes/simulador">Testar o robô (simulador)</Link>
         </span>
       </div>
       <Notice error={error} ok={ok} />

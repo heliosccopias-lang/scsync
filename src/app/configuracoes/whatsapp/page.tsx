@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Notice, Shell } from "@/components/Shell";
 import { CopyButton } from "@/components/CopyButton";
@@ -313,6 +314,9 @@ export default async function WhatsAppSettingsPage({ searchParams }: { searchPar
       <section className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Como usar</h2>
         <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{HELP_TEXT}</pre>
+        <p style={{ marginBottom: 0 }}>
+          Ainda sem a Z-API? <Link href="/cartoes/simulador">Teste o robô no simulador</Link>: as mensagens passam pelo mesmo caminho do WhatsApp.
+        </p>
       </section>
 
       <section className="card">

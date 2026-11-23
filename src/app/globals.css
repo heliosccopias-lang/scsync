@@ -174,3 +174,16 @@ details > summary.btn::-webkit-details-marker { display: none; }
 .tag-counter { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--orange-soft); color: var(--orange-ink); margin-left: 6px; vertical-align: middle; }
 .preview-cta { display: flex; justify-content: flex-end; padding: 6px 16px 0; max-width: 1200px; margin: 0 auto; }
 .preview-cta .menu-list { top: 34px; }
+
+/* WhatsApp robot simulator */
+.wa-chat { margin-top: 14px; background: #efe7dd; border-radius: 10px; padding: 12px; max-height: 520px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 6px; }
+.wa-row { display: flex; margin: 3px 0; }
+.wa-in { justify-content: flex-start; }
+.wa-out { justify-content: flex-end; }
+.wa-bubble { max-width: 75%; padding: 7px 10px; border-radius: 8px; font-size: 14px; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
+.wa-bubble-in { background: #fff; }
+.wa-bubble-out { background: #fde3cf; }
+.wa-bubble-muted { background: #f1f1f1; color: #666; }
+.wa-who { font-size: 12px; font-weight: 600; color: var(--orange-ink); margin-bottom: 2px; }
+.wa-time { font-size: 11px; color: #888; text-align: right; margin-top: 2px; }
+.wa-tag { display: inline-block; margin-top: 4px; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--ok); color: #fff; }
