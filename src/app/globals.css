@@ -187,3 +187,6 @@ details > summary.btn::-webkit-details-marker { display: none; }
 .wa-who { font-size: 12px; font-weight: 600; color: var(--orange-ink); margin-bottom: 2px; }
 .wa-time { font-size: 11px; color: #888; text-align: right; margin-top: 2px; }
 .wa-tag { display: inline-block; margin-top: 4px; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--ok); color: #fff; }
+.sale-table { table-layout: fixed; width: 100%; }
+.sale-table input { width: 100%; }
+@media (max-width: 700px) { .sale-table col:nth-child(3), .sale-table col:nth-child(4) { width: 110px !important; } .sale-table col:nth-child(2) { width: 64px !important; } }

@@ -24,6 +24,7 @@ export function CounterSaleForm({
   const [state, action, pending] = useActionState<SaleState, FormData>(createSale, {});
   const v = state.values ?? {};
   const [total, setTotal] = useState(0);
+  const [lineTotals, setLineTotals] = useState<number[]>(() => Array(SALE_LINES).fill(0));
   const [method, setMethod] = useState(v.method ?? (canReceive ? "cash" : "later"));
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
 
@@ -39,11 +40,17 @@ export function CounterSaleForm({
       if (hit && qty && !qty.value) qty.value = "1";
     }
     let sum = 0;
+    const lines: number[] = [];
     for (let i = 0; i < SALE_LINES; i++) {
       const q = (form.elements.namedItem(`item_qty_${i}`) as HTMLInputElement | null)?.value ?? "";
       const p = (form.elements.namedItem(`item_price_${i}`) as HTMLInputElement | null)?.value ?? "";
-      if (p) sum += Math.round((num(q) || 0) * num(p) * 100);
+      // Quantity like the server reads it (2,5 or 2.5); price in Brazilian format (1.250,00).
+      const qty = q.trim() ? Number(q.trim().replace(",", ".")) || 0 : 1;
+      const line = p ? Math.round(qty * num(p) * 100) : 0;
+      lines.push(line);
+      sum += line;
     }
+    setLineTotals(lines);
     const d = (form.elements.namedItem("discount") as HTMLInputElement | null)?.value ?? "";
     setTotal(Math.max(0, sum - Math.round(num(d) * 100)));
   }
@@ -75,12 +82,19 @@ export function CounterSaleForm({
             ))}
           </select>
         </div>
-        <table>
+        <table className="sale-table">
+          <colgroup>
+            <col />
+            <col style={{ width: 90 }} />
+            <col style={{ width: 150 }} />
+            <col style={{ width: 140 }} />
+          </colgroup>
           <thead>
             <tr>
-              <th>Produto</th>
-              <th style={{ width: 90 }}>Qtd</th>
-              <th style={{ width: 140 }}>Valor unitário (R$)</th>
+              <th>Descrição do produto</th>
+              <th className="num">Quantidade</th>
+              <th className="num">Preço unitário (R$)</th>
+              <th className="num">Valor total</th>
             </tr>
           </thead>
           <tbody>
@@ -92,16 +106,20 @@ export function CounterSaleForm({
                     list="sale-items"
                     autoComplete="off"
                     placeholder={i === 0 ? "Digite ou escolha o produto" : ""}
-                    aria-label={`Produto ${i + 1}`}
+                    aria-label={`Descrição do produto ${i + 1}`}
+                    style={{ width: "100%" }}
                     defaultValue={v[`item_desc_${i}`]}
                     {...bad(`item_desc_${i}`)}
                   />
                 </td>
                 <td>
-                  <input name={`item_qty_${i}`} inputMode="decimal" aria-label={`Quantidade ${i + 1}`} defaultValue={v[`item_qty_${i}`]} {...bad(`item_qty_${i}`)} />
+                  <input name={`item_qty_${i}`} inputMode="decimal" aria-label={`Quantidade ${i + 1}`} defaultValue={v[`item_qty_${i}`]} style={{ textAlign: "right" }} {...bad(`item_qty_${i}`)} />
                 </td>
                 <td>
-                  <input name={`item_price_${i}`} inputMode="decimal" aria-label={`Valor ${i + 1}`} defaultValue={v[`item_price_${i}`]} {...bad(`item_price_${i}`)} />
+                  <input name={`item_price_${i}`} inputMode="decimal" aria-label={`Preço unitário ${i + 1}`} defaultValue={v[`item_price_${i}`]} style={{ textAlign: "right" }} {...bad(`item_price_${i}`)} />
+                </td>
+                <td className="num" style={{ whiteSpace: "nowrap", fontWeight: lineTotals[i] ? 600 : 400 }}>
+                  {lineTotals[i] ? brl(lineTotals[i]) : <span className="muted">—</span>}
                 </td>
               </tr>
             ))}
