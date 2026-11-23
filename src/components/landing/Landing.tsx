@@ -202,7 +202,7 @@ export function Landing() {
         <div className="lp-wrap">
           <div className="lp-head">
             <span className="lp-eyebrow">Recursos</span>
-            <h2>Tudo o que a gráfica precisa no dia a dia</h2>
+            <h2>Tudo o que a gráfica precisa no dia a dia</h2>
             <p>Do balcão ao fechamento do mês, num sistema só.</p>
           </div>
           <div className="lp-features">
