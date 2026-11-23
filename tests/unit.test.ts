@@ -32,6 +32,13 @@ describe("money", () => {
     expect(parseQuantity("2,5")).toBe(2.5);
     expect(parseQuantity("0")).toBeNull();
     expect(parseQuantity("dois")).toBeNull();
+    // print shop quantities: dots group thousands, comma is the decimal mark
+    expect(parseQuantity("1.000")).toBe(1000);
+    expect(parseQuantity("12.500")).toBe(12500);
+    expect(parseQuantity("1.000,5")).toBe(1000.5);
+    expect(parseQuantity("2.5")).toBe(2.5);
+    expect(parseQuantity("1000")).toBe(1000);
+    expect(parseQuantity("1.00.0")).toBeNull();
   });
 
   it("splits installments with the remainder on the last one", () => {

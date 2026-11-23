@@ -4,6 +4,7 @@ import { useActionState, useState, type FormEvent } from "react";
 import { createSale, type SaleState } from "./actions";
 import { SALE_LINES } from "./constants";
 import type { CatalogEntry } from "@/app/os/nova/NewOrderForm";
+import { parseQuantity } from "@/lib/money";
 
 const brl = (cents: number) => (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const num = (s: string) => {
@@ -51,7 +52,7 @@ export function CounterSaleForm({
       const q = (form.elements.namedItem(`item_qty_${i}`) as HTMLInputElement | null)?.value ?? "";
       const p = (form.elements.namedItem(`item_price_${i}`) as HTMLInputElement | null)?.value ?? "";
       // Quantity like the server reads it (2,5 or 2.5); price in Brazilian format (1.250,00).
-      const qty = q.trim() ? Number(q.trim().replace(",", ".")) || 0 : 1;
+      const qty = parseQuantity(q) ?? 0;
       const line = p ? Math.round(qty * num(p) * 100) : 0;
       lines.push(line);
       sum += line;

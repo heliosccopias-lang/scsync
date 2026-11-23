@@ -1,1 +1,1 @@
-export const LINES = 4;
+export const LINES = 6;

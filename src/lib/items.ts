@@ -15,7 +15,7 @@ export function parseItemRows(values: Record<string, string>, rows: number): Ite
       continue;
     }
     const quantity = parseQuantity(s(`item_qty_${i}`));
-    if (quantity === null) return { error: `Item ${i + 1}: quantidade inválida. Use números, por exemplo 1 ou 2,5.`, field: `item_qty_${i}` };
+    if (quantity === null) return { error: `Item ${i + 1}: quantidade inválida. Use números, por exemplo 1, 1.000 ou 2,5.`, field: `item_qty_${i}` };
     if (!rawPrice) return { error: `Item ${i + 1}: informe o valor unitário, por exemplo 150,00.`, field: `item_price_${i}` };
     const unit = parseBRL(rawPrice);
     if (unit === null || unit < 0) {

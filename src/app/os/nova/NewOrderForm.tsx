@@ -5,6 +5,7 @@ import { createOrder, type FormState } from "./actions";
 import { LINES } from "./constants";
 import { PrintSpecFields } from "@/components/PrintSpecFields";
 import { readPrintSpec } from "@/lib/grafica";
+import { ItemsTable } from "@/components/ItemsTable";
 
 export type CatalogEntry = { id: string; kind: string; name: string; price_cents: number };
 
@@ -131,27 +132,17 @@ export function NewOrderForm({
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Serviços e produtos</h2>
-        <div className="row muted" style={{ fontSize: 12, marginBottom: 4, flexWrap: "nowrap" }}>
-          <span style={{ width: 120 }}>Tipo</span>
-          <span style={{ flex: 3 }}>Descrição</span>
-          <span style={{ width: 70 }}>Qtd</span>
-          <span style={{ width: 150 }}>Valor unitário (R$)</span>
-        </div>
-        {Array.from({ length: LINES }, (_, i) => (
-          <div key={i} className="row" style={{ marginBottom: 8, flexWrap: "nowrap" }}>
-            <select name={`item_kind_${i}`} aria-label={`Tipo do item ${i + 1}`} defaultValue={v[`item_kind_${i}`] ?? "service"} style={{ width: 120 }}>
-              <option value="service">Serviço</option>
-              <option value="product">Produto</option>
-            </select>
-            <input name={`item_desc_${i}`} list="catalog-items" autoComplete="off" placeholder={i === 0 ? "Digite ou escolha do catálogo" : ""} aria-label={`Descrição do item ${i + 1}`} defaultValue={v[`item_desc_${i}`]} style={{ flex: 3 }} {...bad(`item_desc_${i}`)} />
-            <input name={`item_qty_${i}`} inputMode="decimal" aria-label={`Quantidade do item ${i + 1}`} defaultValue={v[`item_qty_${i}`] ?? "1"} style={{ width: 70 }} {...bad(`item_qty_${i}`)} />
-            <input name={`item_price_${i}`} inputMode="decimal" placeholder="150,00" aria-label={`Valor unitário do item ${i + 1}`} defaultValue={v[`item_price_${i}`]} style={{ width: 150 }} {...bad(`item_price_${i}`)} />
-          </div>
-        ))}
-        <div className="field" style={{ maxWidth: 200, marginTop: 12 }}>
-          <label htmlFor="discount">Desconto (R$)</label>
-          <input id="discount" name="discount" inputMode="decimal" placeholder="0,00" defaultValue={v.discount} {...bad("discount")} />
-        </div>
+        <ItemsTable
+          rows={LINES}
+          initial={(i) => ({
+            kind: v[`item_kind_${i}`] ?? "service",
+            desc: v[`item_desc_${i}`] ?? "",
+            qty: v[`item_qty_${i}`] ?? "1",
+            price: v[`item_price_${i}`] ?? "",
+          })}
+          bad={bad}
+          discountDefault={v.discount ?? ""}
+        />
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

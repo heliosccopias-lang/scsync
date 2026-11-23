@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { CatalogList, fillFromCatalog, type CatalogEntry } from "../nova/NewOrderForm";
 import { updateItems, type EditItemsState } from "./items-action";
+import { ItemsTable } from "@/components/ItemsTable";
 
 type Item = { kind: string; description: string; quantity: number | string; unit_price_cents: number };
 
@@ -46,55 +47,23 @@ export function EditItemsForm({
       <p className="muted" style={{ marginTop: 0 }}>
         Altere, inclua ou apague linhas (deixe a descrição vazia para remover). As parcelas são recalculadas com o novo total, mantendo vencimentos e forma. Depois de lançar as contas, a OS fica travada.
       </p>
-      <div className="row muted" style={{ fontSize: 12, marginBottom: 4, flexWrap: "nowrap" }}>
-        <span style={{ width: 120 }}>Tipo</span>
-        <span style={{ flex: 3 }}>Descrição</span>
-        <span style={{ width: 70 }}>Qtd</span>
-        <span style={{ width: 150 }}>Valor unitário (R$)</span>
-      </div>
-      {Array.from({ length: rows }, (_, i) => {
-        const it = items[i];
-        return (
-          <div key={i} className="row" style={{ marginBottom: 8, flexWrap: "nowrap" }}>
-            <select name={`item_kind_${i}`} aria-label={`Tipo do item ${i + 1}`} defaultValue={val(`item_kind_${i}`, it?.kind ?? "service")} style={{ width: 120 }}>
-              <option value="service">Serviço</option>
-              <option value="product">Produto</option>
-            </select>
-            <input
-              name={`item_desc_${i}`}
-              list="catalog-items"
-              autoComplete="off"
-              aria-label={`Descrição do item ${i + 1}`}
-              placeholder={it ? "" : "Novo item"}
-              defaultValue={val(`item_desc_${i}`, it?.description ?? "")}
-              style={{ flex: 3 }}
-              {...bad(`item_desc_${i}`)}
-            />
-            <input
-              name={`item_qty_${i}`}
-              inputMode="decimal"
-              aria-label={`Quantidade do item ${i + 1}`}
-              defaultValue={val(`item_qty_${i}`, it ? String(Number(it.quantity)).replace(".", ",") : "1")}
-              style={{ width: 70 }}
-              {...bad(`item_qty_${i}`)}
-            />
-            <input
-              name={`item_price_${i}`}
-              inputMode="decimal"
-              aria-label={`Valor unitário do item ${i + 1}`}
-              placeholder="150,00"
-              defaultValue={val(`item_price_${i}`, it ? money(it.unit_price_cents) : "")}
-              style={{ width: 150 }}
-              {...bad(`item_price_${i}`)}
-            />
-          </div>
-        );
-      })}
-      <div className="row" style={{ alignItems: "flex-end", marginTop: 12 }}>
-        <div className="field" style={{ width: 200, marginBottom: 0 }}>
-          <label htmlFor="edit_discount">Desconto (R$)</label>
-          <input id="edit_discount" name="discount" inputMode="decimal" defaultValue={val("discount", money(discountCents))} {...bad("discount")} />
-        </div>
+      <ItemsTable
+        rows={rows}
+        initial={(i) => {
+          const it = items[i];
+          return {
+            kind: val(`item_kind_${i}`, it?.kind ?? "service"),
+            desc: val(`item_desc_${i}`, it?.description ?? ""),
+            qty: val(`item_qty_${i}`, it ? String(Number(it.quantity)).replace(".", ",") : "1"),
+            price: val(`item_price_${i}`, it ? money(it.unit_price_cents) : ""),
+          };
+        }}
+        bad={bad}
+        discountDefault={val("discount", money(discountCents))}
+        discountId="edit_discount"
+        firstPlaceholder=""
+      />
+      <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
         <button className="btn btn-primary" disabled={pending}>
           {pending ? "Salvando..." : "Salvar itens"}
         </button>

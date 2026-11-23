@@ -32,9 +32,18 @@ export function parseBRL(input: string): number | null {
 
 /** Parses a quantity like "1", "2,5", "0.75". Returns null if not a positive number with up to 3 decimals. */
 export function parseQuantity(input: string): number | null {
-  const s = input.trim().replace(",", ".");
+  let s = input.trim().replace(/\s/g, "");
   if (!s) return 1;
-  if (!/^\d+(\.\d{1,3})?$/.test(s)) return null;
+  if (s.includes(",")) {
+    // Brazilian: comma is the decimal mark, dots group thousands (1.000,5).
+    if (!/^\d{1,3}(\.\d{3})*,\d{1,3}$|^\d+,\d{1,3}$/.test(s)) return null;
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    // 1.000 or 12.500: thousands, as a print shop writes quantities.
+    s = s.replace(/\./g, "");
+  } else if (!/^\d+(\.\d{1,2})?$/.test(s)) {
+    return null;
+  }
   const n = Number(s);
   return n > 0 ? n : null;
 }
