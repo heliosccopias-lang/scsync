@@ -23,7 +23,7 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
   const existingCustomer = s("customer_id");
   const doc = s("customer_doc").replace(/\D/g, "");
   if (!existingCustomer) {
-    if (!s("customer_name")) return fail("Informe o nome do cliente ou escolha um cliente cadastrado.", "customer_name");
+    if (!s("customer_name")) return fail("Escolha o cliente ou cadastre um novo em \"+ Novo cliente\".", "customer_name");
     if (doc && !(isValidCpf(doc) || isValidCnpj(doc))) return fail("CPF/CNPJ inválido. Confira os números.", "customer_doc");
   }
 

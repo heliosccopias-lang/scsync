@@ -386,3 +386,19 @@ details.popover > .popover-panel { right: 0; padding-top: 28px; box-shadow: 0 10
 .os-pay { grid-template-columns: minmax(180px, 260px) 90px 170px; justify-content: start; margin-bottom: 6px; }
 .os-pay-cond { grid-template-columns: minmax(200px, 300px) minmax(180px, 240px) 90px 170px; }
 @media (max-width: 760px) { .os-pay, .os-pay-cond { grid-template-columns: 1fr 1fr; } }
+/* "+ Novo cliente" floating form */
+.nc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 10px; margin-top: 8px; }
+.nc-grid .field { margin-bottom: 0; }
+.nc-grid label { display: block; font-size: 12px; margin-bottom: 3px; }
+.nc-grid input { height: 36px; padding: 6px 8px; }
+.nc-span2 { grid-column: span 2; }
+.nc-span3 { grid-column: span 3; }
+.nc-span4 { grid-column: span 4; }
+.nc-sep { margin-top: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #777); }
+@media (max-width: 600px) { .nc-grid { grid-template-columns: 1fr 1fr; } .nc-span3, .nc-span4 { grid-column: span 2; } }
+
+.os-cust-pick { grid-template-columns: minmax(240px, 420px) auto; justify-content: start; }
+.os-head { grid-template-columns: auto minmax(140px, 1fr) 160px; }
+.os-head.os-head-2t { grid-template-columns: auto minmax(140px, 1fr) minmax(140px, 1fr) 160px; }
+.os-row .new-customer > summary, .row .new-customer > summary { height: 38px; padding: 0 14px; display: inline-flex; align-items: center; font-size: 14px; }
+@media (max-width: 760px) { .os-head, .os-head.os-head-2t { grid-template-columns: 1fr 1fr; } .os-cust-pick { grid-template-columns: 1fr auto; } }

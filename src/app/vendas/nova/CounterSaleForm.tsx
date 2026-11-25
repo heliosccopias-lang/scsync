@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition, type FormEvent } from "react";
-import { createSale, quickCustomer, type QuickCustomerResult, type SaleState } from "./actions";
+import { useActionState, useState, type FormEvent } from "react";
+import { createSale, type SaleState } from "./actions";
+import { NewCustomerButton } from "@/components/NewCustomerButton";
 import { SALE_LINES, SALE_START_LINES } from "./constants";
 import type { CatalogEntry } from "@/app/os/nova/NewOrderForm";
 import { parseQuantity } from "@/lib/money";
@@ -44,31 +45,6 @@ export function CounterSaleForm({
   // Quick "+ Novo cliente": saved right away and picked in the customer field.
   const [customerList, setCustomerList] = useState(customers);
   const [customerId, setCustomerId] = useState(v.customer_id ?? "");
-  const [newCust, setNewCust] = useState({ name: "", cpf_cnpj: "", phone: "", email: "" });
-  const [custError, setCustError] = useState("");
-  const [savingCust, startSaving] = useTransition();
-  const newCustBox = useRef<HTMLDetailsElement>(null);
-  const [dupe, setDupe] = useState<QuickCustomerResult["existing"] | null>(null);
-  const normName = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
-  // Instant hint while typing the name: a customer with this name is already in the list.
-  const sameName = newCust.name.trim() ? customerList.find((c) => normName(c.name) === normName(newCust.name)) : undefined;
-  function pickCustomer(id: string) {
-    setCustomerId(id);
-    setDupe(null);
-    setCustError("");
-    setNewCust({ name: "", cpf_cnpj: "", phone: "", email: "" });
-    if (newCustBox.current) newCustBox.current.open = false;
-  }
-  function saveCustomer(force = false) {
-    setCustError("");
-    startSaving(async () => {
-      const r = await quickCustomer({ ...newCust, force });
-      if (r.existing) return setDupe(r.existing);
-      if (r.error || !r.id) return setCustError(r.error ?? "Não foi possível cadastrar o cliente.");
-      setCustomerList((l) => [...l, { id: r.id!, name: r.name! }].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")));
-      pickCustomer(r.id);
-    });
-  }
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
 
   function onInput(e: FormEvent<HTMLFormElement>) {
@@ -129,69 +105,13 @@ export function CounterSaleForm({
             </select>
           </div>
           {canAddCustomer ? (
-            <details className="popover" ref={newCustBox} style={{ marginBottom: 16 }}>
-              <summary className="btn btn-secondary">+ Novo cliente</summary>
-              <div
-                className="card popover-panel"
-                style={{ position: "absolute", zIndex: 5, width: 340, textAlign: "left" }}
-                onKeyDown={(e) => {
-                  // Enter saves the customer instead of submitting the sale.
-                  if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") {
-                    e.preventDefault();
-                    saveCustomer();
-                  }
-                }}
-              >
-                <button type="button" className="popover-close" data-close aria-label="Fechar">✕</button>
-                <strong>Novo cliente</strong>
-                {dupe ? (
-                  <div className="notice notice-warn" role="alert" style={{ marginTop: 8 }}>
-                    <strong>Cliente já cadastrado</strong> com {dupe.match === "documento" ? "este CPF/CNPJ" : dupe.match === "nome" ? "este nome" : "este telefone"}: <strong>{dupe.name}</strong>.
-                    <div className="row" style={{ marginTop: 8, gap: 6 }}>
-                      <button type="button" className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 13 }} onClick={() => pickCustomer(dupe.id)}>
-                        Usar este cliente
-                      </button>
-                      {dupe.match !== "documento" ? (
-                        <button type="button" className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 13 }} onClick={() => saveCustomer(true)} disabled={savingCust}>
-                          É outra pessoa: cadastrar
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : sameName ? (
-                  <div className="notice notice-warn" style={{ marginTop: 8 }}>
-                    Já existe <strong>{sameName.name}</strong> no cadastro.{" "}
-                    <button type="button" className="linklike" onClick={() => pickCustomer(sameName.id)}>
-                      Usar este cliente
-                    </button>
-                  </div>
-                ) : null}
-                {custError ? (
-                  <div className="notice notice-error" role="alert" style={{ marginTop: 8 }}>
-                    {custError}
-                  </div>
-                ) : null}
-                <div className="field" style={{ marginTop: 8 }}>
-                  <label htmlFor="nc_name">Nome *</label>
-                  <input id="nc_name" value={newCust.name} onChange={(e) => (setDupe(null), setNewCust({ ...newCust, name: e.currentTarget.value }))} autoComplete="off" />
-                </div>
-                <div className="field">
-                  <label htmlFor="nc_doc">CPF ou CNPJ</label>
-                  <input id="nc_doc" inputMode="numeric" value={newCust.cpf_cnpj} onChange={(e) => (setDupe(null), setNewCust({ ...newCust, cpf_cnpj: e.currentTarget.value }))} autoComplete="off" />
-                </div>
-                <div className="field">
-                  <label htmlFor="nc_phone">Telefone / WhatsApp</label>
-                  <input id="nc_phone" inputMode="tel" value={newCust.phone} onChange={(e) => (setDupe(null), setNewCust({ ...newCust, phone: e.currentTarget.value }))} autoComplete="off" />
-                </div>
-                <div className="field">
-                  <label htmlFor="nc_email">E-mail</label>
-                  <input id="nc_email" type="email" value={newCust.email} onChange={(e) => setNewCust({ ...newCust, email: e.currentTarget.value })} autoComplete="off" />
-                </div>
-                <button type="button" className="btn btn-primary" onClick={() => saveCustomer()} disabled={savingCust}>
-                  {savingCust ? "Salvando…" : "Cadastrar e usar na venda"}
-                </button>
-              </div>
-            </details>
+            <div style={{ marginBottom: 14 }}>
+              <NewCustomerButton
+                customers={customerList}
+                onPick={setCustomerId}
+                onCreated={(c) => setCustomerList((l) => [...l, c].sort((x, y) => x.name.localeCompare(y.name, "pt-BR")))}
+              />
+            </div>
           ) : null}
           <div className="field attendant-field" style={{ flex: 1, minWidth: 240, maxWidth: 360 }}>
             <label htmlFor="technician_id">

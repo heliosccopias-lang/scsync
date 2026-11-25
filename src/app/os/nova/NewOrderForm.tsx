@@ -6,6 +6,7 @@ import { LINES, START_LINES } from "./constants";
 import { PrintSpecFields } from "@/components/PrintSpecFields";
 import { readPrintSpec } from "@/lib/grafica";
 import { ItemsTable } from "@/components/ItemsTable";
+import { NewCustomerButton } from "@/components/NewCustomerButton";
 
 export type CatalogEntry = { id: string; kind: string; name: string; price_cents: number };
 
@@ -31,6 +32,7 @@ export function NewOrderForm({
   const formKey = JSON.stringify(v);
   // New-customer fields only show while "Novo cliente" is picked.
   const [customerId, setCustomerId] = useState(v.customer_id ?? "");
+  const [customerList, setCustomerList] = useState(customers);
 
   return (
     <form action={action} key={formKey} noValidate onInput={(e) => fillFromCatalog(e, catalog, adjustments)}>
@@ -43,8 +45,9 @@ export function NewOrderForm({
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0, marginBottom: 12 }}>Dados da OS</h2>
-        <div className={technicians.length > 1 ? "os-head os-head-2t" : "os-head"}>
+        <div className={technicians.length > 0 ? "os-head os-head-2t" : "os-head"}>
           <div className="field">
+            <input type="hidden" name="attendance_type" value="external" />
             <span className="os-label">Tipo</span>
             <div className="seg" role="radiogroup" aria-label="Tipo">
               <label>
@@ -58,22 +61,7 @@ export function NewOrderForm({
             </div>
           </div>
           <div className="field">
-            <span className="os-label">Atendimento</span>
-            <div className="seg" role="radiogroup" aria-label="Atendimento">
-              {[
-                ["external", "Externo"],
-                ["internal", "Interno"],
-                ["warranty", "Garantia"],
-              ].map(([val, label]) => (
-                <label key={val}>
-                  <input type="radio" name="attendance_type" value={val} defaultChecked={(v.attendance_type ?? "external") === val} />
-                  {label}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="technician_id">Técnico</label>
+            <label htmlFor="technician_id">Setor</label>
             <select id="technician_id" name="technician_id" defaultValue={v.technician_id ?? ""}>
               <option value="">— Nenhum —</option>
               {technicians.map((t) => (
@@ -83,9 +71,9 @@ export function NewOrderForm({
               ))}
             </select>
           </div>
-          {technicians.length > 1 ? (
+          {technicians.length > 0 ? (
             <div className="field">
-              <label htmlFor="second_technician_id" title="O segundo técnico divide a comissão">2º técnico (comissão)</label>
+              <label htmlFor="second_technician_id">Atendente</label>
               <select id="second_technician_id" name="second_technician_id" defaultValue={v.second_technician_id ?? ""}>
                 <option value="">— Nenhum —</option>
                 {technicians.map((t) => (
@@ -101,40 +89,23 @@ export function NewOrderForm({
             <input id="delivery_date" name="delivery_date" type="date" defaultValue={v.delivery_date} />
           </div>
         </div>
-        <div className={customerId ? "os-row os-row-1" : "os-row os-cust"}>
+        <div className="os-row os-cust-pick">
           <div className="field">
             <label htmlFor="customer_id">Cliente</label>
-            <select id="customer_id" name="customer_id" value={customerId} onChange={(e) => setCustomerId(e.currentTarget.value)}>
-              <option value="">— Novo cliente —</option>
-              {customers.map((c) => (
+            <select id="customer_id" name="customer_id" value={customerId} onChange={(e) => setCustomerId(e.currentTarget.value)} {...bad("customer_name")}>
+              <option value="">— Escolha o cliente —</option>
+              {customerList.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
           </div>
-          {!customerId ? (
-            <>
-              <div className="field">
-                <label htmlFor="customer_name">Nome do novo cliente</label>
-                <input id="customer_name" name="customer_name" defaultValue={v.customer_name} {...bad("customer_name")} />
-              </div>
-              <div className="field">
-                <label htmlFor="customer_doc" title="O Asaas exige CPF/CNPJ para cobrar">
-                  CPF/CNPJ <span className="muted">(para cobrar)</span>
-                </label>
-                <input id="customer_doc" name="customer_doc" inputMode="numeric" defaultValue={v.customer_doc} {...bad("customer_doc")} />
-              </div>
-              <div className="field">
-                <label htmlFor="customer_phone">Celular</label>
-                <input id="customer_phone" name="customer_phone" inputMode="tel" defaultValue={v.customer_phone} />
-              </div>
-              <div className="field">
-                <label htmlFor="customer_email">E-mail</label>
-                <input id="customer_email" name="customer_email" type="email" defaultValue={v.customer_email} />
-              </div>
-            </>
-          ) : null}
+          <NewCustomerButton
+            customers={customerList}
+            onPick={setCustomerId}
+            onCreated={(c) => setCustomerList((l) => [...l, c].sort((x, y) => x.name.localeCompare(y.name, "pt-BR")))}
+          />
         </div>
       </div>
 
