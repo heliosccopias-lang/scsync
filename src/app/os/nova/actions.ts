@@ -107,6 +107,10 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
   // Extras the creation function does not take: print-shop job specs and the second technician.
   const extra: Record<string, unknown> = { ...readPrintSpec(s, todayInSaoPaulo()) };
   if (s("second_technician_id")) extra.second_technician_id = s("second_technician_id");
+  if (s("sector_id")) {
+    const { data: sector } = await sb.from("sectors").select("id").eq("id", s("sector_id")).eq("org_id", orgId).maybeSingle();
+    if (sector) extra.sector_id = sector.id;
+  }
   if (finalCustomer) {
     if (s("contact_name")) extra.contact_name = s("contact_name").slice(0, 120);
     if (s("contact_phone")) extra.contact_phone = s("contact_phone").slice(0, 30);

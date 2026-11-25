@@ -13,6 +13,7 @@ export type CatalogEntry = { id: string; kind: string; name: string; price_cents
 export function NewOrderForm({
   customers,
   technicians,
+  sectors = [],
   catalog,
   conditions,
   adjustments,
@@ -20,6 +21,7 @@ export function NewOrderForm({
 }: {
   customers: { id: string; name: string }[];
   technicians: { id: string; name: string }[];
+  sectors?: { id: string; name: string }[];
   catalog: CatalogEntry[];
   conditions: { id: string; name: string }[];
   adjustments: Record<string, number>;
@@ -45,7 +47,7 @@ export function NewOrderForm({
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0, marginBottom: 12 }}>Dados da OS</h2>
-        <div className={technicians.length > 0 ? "os-head os-head-2t" : "os-head"}>
+        <div className="os-head os-head-2t">
           <div className="field">
             <input type="hidden" name="attendance_type" value="external" />
             <span className="os-label">Tipo</span>
@@ -61,7 +63,18 @@ export function NewOrderForm({
             </div>
           </div>
           <div className="field">
-            <label htmlFor="technician_id">Setor</label>
+            <label htmlFor="sector_id">Setor</label>
+            <select id="sector_id" name="sector_id" defaultValue={v.sector_id ?? ""}>
+              <option value="">— Nenhum —</option>
+              {sectors.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="technician_id">Atendente</label>
             <select id="technician_id" name="technician_id" defaultValue={v.technician_id ?? ""}>
               <option value="">— Nenhum —</option>
               {technicians.map((t) => (
@@ -71,19 +84,6 @@ export function NewOrderForm({
               ))}
             </select>
           </div>
-          {technicians.length > 0 ? (
-            <div className="field">
-              <label htmlFor="second_technician_id">Atendente</label>
-              <select id="second_technician_id" name="second_technician_id" defaultValue={v.second_technician_id ?? ""}>
-                <option value="">— Nenhum —</option>
-                {technicians.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
           <div className="field">
             <label htmlFor="delivery_date">Previsão de entrega</label>
             <input id="delivery_date" name="delivery_date" type="date" defaultValue={v.delivery_date} />

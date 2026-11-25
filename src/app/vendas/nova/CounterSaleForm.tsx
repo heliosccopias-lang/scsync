@@ -23,6 +23,7 @@ export function CounterSaleForm({
   canManageAttendants,
   conditions = [],
   canAddCustomer = false,
+  sectors = [],
 }: {
   catalog: CatalogEntry[];
   customers: { id: string; name: string }[];
@@ -32,6 +33,7 @@ export function CounterSaleForm({
   canManageAttendants: boolean;
   conditions?: { id: string; name: string }[];
   canAddCustomer?: boolean;
+  sectors?: { id: string; name: string }[];
 }) {
   const [state, action, pending] = useActionState<SaleState, FormData>(createSale, {});
   const v = state.values ?? {};
@@ -111,6 +113,19 @@ export function CounterSaleForm({
                 onPick={setCustomerId}
                 onCreated={(c) => setCustomerList((l) => [...l, c].sort((x, y) => x.name.localeCompare(y.name, "pt-BR")))}
               />
+            </div>
+          ) : null}
+          {sectors.length ? (
+            <div className="field" style={{ minWidth: 170, maxWidth: 220 }}>
+              <label htmlFor="sector_id">Setor</label>
+              <select id="sector_id" name="sector_id" defaultValue={v.sector_id ?? sectors.find((x) => x.name.toLowerCase() === "balcão")?.id ?? ""}>
+                <option value="">— Nenhum —</option>
+                {sectors.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </select>
             </div>
           ) : null}
           <div className="field attendant-field" style={{ flex: 1, minWidth: 240, maxWidth: 360 }}>

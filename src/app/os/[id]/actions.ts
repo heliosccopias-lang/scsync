@@ -249,11 +249,18 @@ export async function updateDetails(form: FormData) {
     if (error) back(id, "error", "Não foi possível salvar.");
     back(id, "ok", "Laudo e observações atualizados.");
   }
+  // The sector must be one of this company's.
+  let sectorId: string | null = null;
+  if (s("sector_id")) {
+    const { data: sec } = await sb.from("sectors").select("id").eq("id", s("sector_id")!).eq("org_id", orgId).maybeSingle();
+    sectorId = (sec?.id as string | undefined) ?? null;
+  }
   const { error } = await sb
     .from("service_orders")
     .update({
       technician_id: s("technician_id"),
       second_technician_id: s("second_technician_id"),
+      sector_id: sectorId,
       // Walk-in contact (only sent when the OS is for "Consumidor final").
       ...(form.has("contact_name") ? { contact_name: s("contact_name")?.slice(0, 120) ?? null, contact_phone: s("contact_phone")?.slice(0, 30) ?? null } : {}),
       delivery_date: delivery && /^\d{4}-\d{2}-\d{2}$/.test(delivery) ? delivery : null,

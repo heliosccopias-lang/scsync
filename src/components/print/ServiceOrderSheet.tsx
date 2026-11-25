@@ -34,6 +34,7 @@ export type SheetData = {
   org: { name: string; cnpj: string | null };
   customer: { name: string; cpf_cnpj: string | null; email: string | null; phone: string | null } | null;
   technician: string | null;
+  sector?: string | null;
   items: { id: string; kind: string; description: string; quantity: number; unit_price_cents: number; total_cents: number; rejected: boolean }[];
   installments: { id: string; number: number; due_date: string; method: string; amount_cents: number }[];
 };
@@ -101,9 +102,14 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
         <div>
           <span>Previsão de entrega</span> {fmtDate(os.delivery_date)}
         </div>
+        {data.sector ? (
+          <div>
+            <span>Setor</span> {data.sector}
+          </div>
+        ) : null}
         {data.technician ? (
           <div>
-            <span>Técnico</span> {data.technician}
+            <span>Atendente</span> {data.technician}
           </div>
         ) : null}
         {os.technical_report ? (
@@ -247,7 +253,7 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
       <footer className="signatures">
         <div>
           <div className="line" />
-          {production ? "Técnico responsável" : org.name}
+          {production ? "Responsável pela produção" : org.name}
         </div>
         <div>
           <div className="line" />

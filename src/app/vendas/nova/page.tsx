@@ -5,11 +5,12 @@ import { CounterSaleForm } from "./CounterSaleForm";
 /** Counter sale: products off the shelf, stock out and payment in one go. */
 export default async function CounterSalePage() {
   const { sb, orgId, orgName, can, user } = await requireOrg();
-  const [{ data: catalog }, { data: customers }, { data: technicians }, { data: conditions }] = await Promise.all([
+  const [{ data: catalog }, { data: customers }, { data: technicians }, { data: conditions }, { data: sectors }] = await Promise.all([
     sb.from("catalog_items").select("id, kind, name, price_cents, code").eq("org_id", orgId).eq("active", true).order("name").limit(3000),
     sb.from("customers").select("id, name").eq("org_id", orgId).order("name").limit(1000),
     sb.from("technicians").select("id, name, user_id").eq("org_id", orgId).eq("active", true).order("name"),
     sb.from("payment_conditions").select("id, name").eq("org_id", orgId).order("name"),
+    sb.from("sectors").select("id, name").eq("org_id", orgId).eq("active", true).order("position").order("name"),
   ]);
   // Whoever is signed in comes chosen, when they are registered as technician/attendant.
   const me = (technicians ?? []).find((t) => t.user_id === user.id)?.id ?? "";
@@ -35,6 +36,7 @@ export default async function CounterSalePage() {
         canManageAttendants={can("settings")}
         canAddCustomer={can("customers.edit")}
         conditions={conditions ?? []}
+        sectors={sectors ?? []}
       />
     </Shell>
   );

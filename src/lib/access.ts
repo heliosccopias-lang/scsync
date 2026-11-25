@@ -68,6 +68,7 @@ const RULES: Rule[] = [
   { prefix: "/configuracoes/whatsapp", owner: true },
   { prefix: "/configuracoes", any: ["settings"] },
   { prefix: "/cadastros/tecnicos", any: ["settings"] },
+  { prefix: "/cadastros/setores", any: ["settings", "os.edit"] },
   { prefix: "/cadastros/checklists", module: "os", any: ["settings", "os.edit"] },
   { prefix: "/cadastros/itens", any: ["catalog.edit", "os.view"] },
   { prefix: "/cadastros/clientes", any: ["customers.edit", "os.view", "finance.view"] },

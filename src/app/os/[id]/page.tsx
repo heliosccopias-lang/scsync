@@ -81,7 +81,7 @@ export default async function ServiceOrderPage({
   const { data: os } = await sb
     .from("service_orders")
     .select(
-      "*, customers(id, name, cpf_cnpj, email, phone), technicians!service_orders_technician_id_fkey(name), second:technicians!service_orders_second_technician_id_fkey(name)",
+      "*, customers(id, name, cpf_cnpj, email, phone), technicians!service_orders_technician_id_fkey(name), second:technicians!service_orders_second_technician_id_fkey(name), sectors(name)",
     )
     .eq("id", id)
     .eq("org_id", orgId)
@@ -157,6 +157,8 @@ export default async function ServiceOrderPage({
   const appUrl = process.env.APP_URL ?? "https://scsync.vercel.app";
   const publicUrl = `${appUrl}/p/${os.share_token}`;
   const technicianName = (os.technicians as unknown as { name: string } | null)?.name ?? null;
+  const sectorName = (os.sectors as unknown as { name: string } | null)?.name ?? null;
+  const { data: sectors } = await sb.from("sectors").select("id, name, active").eq("org_id", orgId).order("position").order("name");
   const secondName = (os.second as unknown as { name: string } | null)?.name ?? null;
   // "OS pronta" notice: from the company's WhatsApp when connected, otherwise a link that opens WhatsApp with the text.
   const showReady = os.kind === "order" && ["done", "paid"].includes(os.status) && (can("os.edit") || can("os.status"));
@@ -294,7 +296,9 @@ export default async function ServiceOrderPage({
         <div className="card">
           <div className="muted">Dados da OS</div>
           <dl className="facts">
-            <dt>Técnico</dt>
+            <dt>Setor</dt>
+            <dd>{sectorName ?? "—"}</dd>
+            <dt>Atendente</dt>
             <dd>
               {technicianName ?? "—"}
               {secondName ? ` e ${secondName}` : ""}
@@ -353,7 +357,20 @@ export default async function ServiceOrderPage({
               ) : null}
               <div className="grid2">
                 <div className="field">
-                  <label htmlFor="d_tech">Setor</label>
+                  <label htmlFor="d_sector">Setor</label>
+                  <select id="d_sector" name="sector_id" defaultValue={os.sector_id ?? ""}>
+                    <option value="">— Nenhum —</option>
+                    {(sectors ?? [])
+                      .filter((t) => t.active || t.id === os.sector_id)
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="d_tech">Atendente</label>
                   <select id="d_tech" name="technician_id" defaultValue={os.technician_id ?? ""}>
                     <option value="">— Nenhum —</option>
                     {(technicians ?? []).map((t) => (
@@ -362,17 +379,8 @@ export default async function ServiceOrderPage({
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="d_tech2">Atendente</label>
-                  <select id="d_tech2" name="second_technician_id" defaultValue={os.second_technician_id ?? ""}>
-                    <option value="">— Nenhum —</option>
-                    {(technicians ?? []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                  {/* The old second technician is kept as it was (no longer edited here). */}
+                  <input type="hidden" name="second_technician_id" value={os.second_technician_id ?? ""} />
                 </div>
                 <div className="field">
                   <label htmlFor="d_att">Atendimento</label>

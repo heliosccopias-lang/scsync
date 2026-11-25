@@ -18,6 +18,7 @@ const ERRORS: Record<string, string> = {
   customer_required: "Venda a prazo precisa de um cliente cadastrado: escolha o cliente no topo.",
   invalid_installments: "Número de parcelas entre 1 e 48 (e cada parcela de pelo menos R$ 0,01).",
   plan_not_paid_now: "Venda a prazo não é recebida na hora.",
+  invalid_sector: "Escolha um setor desta empresa.",
 };
 const METHODS = ["cash", "pix", "debit_card", "credit_card", "transfer", "boleto"];
 
@@ -86,6 +87,7 @@ export async function createSale(_prev: SaleState, form: FormData): Promise<Sale
       card_installments: Number(values.card_installments || 1),
       reference: (values.reference ?? "").trim() || null,
       notes: (values.notes ?? "").trim() || null,
+      sector_id: values.sector_id || null,
       contact_name: values.customer_id ? null : (values.contact_name ?? "").trim() || null,
       contact_phone: values.customer_id ? null : (values.contact_phone ?? "").trim() || null,
     },
