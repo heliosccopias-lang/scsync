@@ -14,18 +14,18 @@ export function PrintSpecFields({ d, prefix = "" }: { d: Defaults; prefix?: stri
   const { checked, other } = splitFinishing(d.finishing);
   const id = (k: string) => `${prefix}${k}`;
   return (
-    <fieldset style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", margin: "0 0 16px" }}>
-      <legend style={{ fontWeight: 600, padding: "0 6px" }}>Trabalho gráfico</legend>
-      <div className="grid2">
-        <div className="field">
+    <fieldset className="print-spec">
+      <legend>Trabalho gráfico</legend>
+      <div className="print-spec-row">
+        <div className="field ps-format">
           <label htmlFor={id("print_format")}>Formato / tamanho</label>
-          <input id={id("print_format")} name="print_format" placeholder="Ex.: 9x5 cm, A4, 10x15 cm" defaultValue={d.print_format ?? ""} />
+          <input id={id("print_format")} name="print_format" placeholder="9x5 cm, A4…" defaultValue={d.print_format ?? ""} />
         </div>
-        <div className="field">
+        <div className="field ps-paper">
           <label htmlFor={id("print_paper")}>Tipo de papel</label>
-          <input id={id("print_paper")} name="print_paper" placeholder="Ex.: Couchê 300g, Sulfite 75g" defaultValue={d.print_paper ?? ""} />
+          <input id={id("print_paper")} name="print_paper" placeholder="Couchê 300g…" defaultValue={d.print_paper ?? ""} />
         </div>
-        <div className="field">
+        <div className="field ps-colors">
           <label htmlFor={id("print_colors")}>Cores</label>
           <select id={id("print_colors")} name="print_colors" defaultValue={d.print_colors ?? ""}>
             <option value="">—</option>
@@ -39,27 +39,32 @@ export function PrintSpecFields({ d, prefix = "" }: { d: Defaults; prefix?: stri
             ) : null}
           </select>
         </div>
-        <div className="field">
-          <span style={{ display: "block", marginBottom: 6 }}>Acabamento</span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+        <div className="field ps-finish">
+          <span className="ps-label">Acabamento</span>
+          <div className="ps-chips">
             {FINISHING_OPTIONS.map(([key, label]) => (
-              <label key={key} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
-                <input type="checkbox" name={`fin_${key}`} defaultChecked={checked.has(key)} style={{ width: "auto" }} /> {label}
+              <label key={key} className="ps-chip">
+                <input type="checkbox" name={`fin_${key}`} defaultChecked={checked.has(key)} />
+                {label}
               </label>
             ))}
           </div>
-          <input name="fin_other" aria-label="Outro acabamento" placeholder="Outro (ex.: verniz, dobra, furo)" defaultValue={other} style={{ marginTop: 8 }} />
+        </div>
+        <div className="field ps-other">
+          <label htmlFor={id("fin_other")}>Outros</label>
+          <input id={id("fin_other")} name="fin_other" placeholder="Verniz, dobra, furo…" defaultValue={other} />
         </div>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <input type="checkbox" name="art_approved" defaultChecked={!!d.art_approved} style={{ width: "auto" }} /> Arte aprovada pelo cliente
+      <div className="print-spec-art">
+        <label className="ps-chip">
+          <input type="checkbox" name="art_approved" defaultChecked={!!d.art_approved} />
+          Arte aprovada pelo cliente
         </label>
         <label htmlFor={id("art_approved_at")} className="muted">
           em
         </label>
-        <input id={id("art_approved_at")} name="art_approved_at" type="date" defaultValue={d.art_approved_at ?? ""} style={{ width: "auto" }} />
-        <span className="muted" style={{ fontSize: 13 }}>Sem data, vale a de hoje.</span>
+        <input id={id("art_approved_at")} name="art_approved_at" type="date" defaultValue={d.art_approved_at ?? ""} />
+        <span className="muted">Sem data, vale a de hoje.</span>
       </div>
     </fieldset>
   );
