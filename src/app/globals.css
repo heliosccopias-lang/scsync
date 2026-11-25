@@ -381,3 +381,8 @@ details.popover > .popover-panel { right: 0; padding-top: 28px; box-shadow: 0 10
 }
 .os-head select, .os-head input, .os-row select, .os-row input { height: 38px; padding-top: 6px; padding-bottom: 6px; }
 .seg label { height: 36px; box-sizing: border-box; }
+
+/* OS payment in one line: (condition) | method | installments | first due date. */
+.os-pay { grid-template-columns: minmax(180px, 260px) 90px 170px; justify-content: start; margin-bottom: 6px; }
+.os-pay-cond { grid-template-columns: minmax(200px, 300px) minmax(180px, 240px) 90px 170px; }
+@media (max-width: 760px) { .os-pay, .os-pay-cond { grid-template-columns: 1fr 1fr; } }

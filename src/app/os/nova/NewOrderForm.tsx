@@ -169,21 +169,21 @@ export function NewOrderForm({
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Pagamento</h2>
-        {conditions.length ? (
-          <div className="field">
-            <label htmlFor="condition_id">Condição de pagamento</label>
-            <select id="condition_id" name="condition_id" defaultValue={v.condition_id ?? ""}>
-              <option value="">— Definir abaixo (parcelas iguais mensais) —</option>
-              {conditions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-        <div className="grid2">
+        <h2 style={{ marginTop: 0, marginBottom: 12 }}>Pagamento</h2>
+        <div className={conditions.length ? "os-row os-pay os-pay-cond" : "os-row os-pay"}>
+          {conditions.length ? (
+            <div className="field">
+              <label htmlFor="condition_id">Condição de pagamento</label>
+              <select id="condition_id" name="condition_id" defaultValue={v.condition_id ?? ""}>
+                <option value="">— Parcelas iguais mensais —</option>
+                {conditions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="field">
             <label htmlFor="method">Forma</label>
             <select id="method" name="method" defaultValue={v.method ?? "pix"}>
@@ -202,7 +202,7 @@ export function NewOrderForm({
             <input id="first_due" name="first_due" type="date" defaultValue={v.first_due ?? today} {...bad("first_due")} />
           </div>
         </div>
-        <p className="muted" style={{ margin: 0 }}>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
           As parcelas são mensais e iguais; a última leva os centavos do arredondamento.
         </p>
       </div>
