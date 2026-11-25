@@ -235,6 +235,11 @@ export default async function ServiceOrderPage({
             {!customer?.cpf_cnpj ? <span className="pill pill-overdue">Sem CPF/CNPJ</span> : null}
           </div>
           <strong>{customer?.name}</strong>
+          {os.contact_name || os.contact_phone ? (
+            <div>
+              <span className="muted">Contato:</span> {[os.contact_name, os.contact_phone].filter(Boolean).join(" · ")}
+            </div>
+          ) : null}
           <div className="muted">
             {customer?.cpf_cnpj ?? "sem CPF/CNPJ"} · {customer?.phone ?? "sem celular"} · {customer?.email ?? "sem e-mail"}
           </div>

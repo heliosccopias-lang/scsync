@@ -85,6 +85,8 @@ export async function createSale(_prev: SaleState, form: FormData): Promise<Sale
       card_installments: Number(values.card_installments || 1),
       reference: (values.reference ?? "").trim() || null,
       notes: (values.notes ?? "").trim() || null,
+      contact_name: values.customer_id ? null : (values.contact_name ?? "").trim() || null,
+      contact_phone: values.customer_id ? null : (values.contact_phone ?? "").trim() || null,
     },
   });
   if (error || !id) {

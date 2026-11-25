@@ -143,6 +143,18 @@ export function CounterSaleForm({
             ) : null}
           </div>
         </div>
+        {!customerId ? (
+          <div className="row" style={{ gap: 12, marginTop: -4, marginBottom: 6 }}>
+            <div className="field" style={{ flex: 2, minWidth: 220, maxWidth: 420, marginBottom: 6 }}>
+              <label htmlFor="contact_name">Nome do cliente</label>
+              <input id="contact_name" name="contact_name" defaultValue={v.contact_name} placeholder="Para identificar a venda" autoComplete="off" maxLength={120} />
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 160, maxWidth: 220, marginBottom: 6 }}>
+              <label htmlFor="contact_phone">Telefone / WhatsApp</label>
+              <input id="contact_phone" name="contact_phone" defaultValue={v.contact_phone} inputMode="tel" placeholder="(11) 99999-0000" autoComplete="off" maxLength={30} />
+            </div>
+          </div>
+        ) : null}
         <table className="sale-table">
           <colgroup>
             <col />

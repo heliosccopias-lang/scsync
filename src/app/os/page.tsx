@@ -21,7 +21,7 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
 
   let query = sb
     .from("service_orders")
-    .select("id, number, status, os_date, total_cents, channel, customers(name)")
+    .select("id, number, status, os_date, total_cents, channel, contact_name, contact_phone, customers(name)")
     .eq("org_id", orgId)
     .order("number", { ascending: false })
     .limit(100);
@@ -30,7 +30,7 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
   if (q && /^\d+$/.test(q)) query = query.eq("number", Number(q));
   const { data: orders } = await query;
   const rows = ((orders ?? []) as unknown as Row[]).filter(
-    (r) => !q || /^\d+$/.test(q) || r.customers?.name.toLowerCase().includes(q.toLowerCase()),
+    (r) => !q || /^\d+$/.test(q) || [r.customers?.name, r.contact_name, r.contact_phone].some((t) => t?.toLowerCase().includes(q.toLowerCase())),
   );
 
   const ids = rows.map((r) => r.id);
@@ -85,7 +85,10 @@ export default async function ServiceOrdersPage({ searchParams }: { searchParams
                   <Link href={`/os/${r.id}`}>#{r.number}</Link>
                   {r.channel === "counter" ? <span className="tag-counter">Balcão</span> : null}
                 </td>
-                <td>{r.customers?.name}</td>
+                <td>
+                  {r.contact_name && r.customers?.name === "Consumidor final" ? r.contact_name : r.customers?.name}
+                  {r.contact_phone ? <span className="muted" style={{ fontSize: 12 }}> · {r.contact_phone}</span> : null}
+                </td>
                 <td>{new Date(r.os_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
                 <td>{osStatusLabel(r.status)}</td>
                 <td>{canPrice ? <PaymentPill status={payBy.get(r.id) ?? "not_billed"} /> : null}</td>

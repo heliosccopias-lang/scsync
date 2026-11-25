@@ -25,7 +25,7 @@ export default async function SaleReceipt({
 
   const { data: os } = await sb
     .from("service_orders")
-    .select("id, number, channel, status, created_at, total_cents, discount_cents, notes, customers(name, cpf_cnpj), technicians!service_orders_technician_id_fkey(name), orgs(name, cnpj)")
+    .select("id, number, channel, status, created_at, total_cents, discount_cents, notes, contact_name, contact_phone, customers(name, cpf_cnpj), technicians!service_orders_technician_id_fkey(name), orgs(name, cnpj)")
     .eq("id", id)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -96,6 +96,11 @@ export default async function SaleReceipt({
             <strong>Cliente:</strong> {c?.name ?? "Consumidor final"}
             {c?.cpf_cnpj ? ` · ${fmtDoc(c.cpf_cnpj)}` : ""}
           </div>
+          {os.contact_name || os.contact_phone ? (
+            <div>
+              <strong>Contato:</strong> {[os.contact_name, os.contact_phone].filter(Boolean).join(" · ")}
+            </div>
+          ) : null}
           {tech ? (
             <div>
               <strong>Atendente:</strong> {tech.name}
