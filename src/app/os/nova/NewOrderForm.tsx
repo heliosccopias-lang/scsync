@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type FormEvent } from "react";
+import { useActionState, useState, type FormEvent } from "react";
 import { createOrder, type FormState } from "./actions";
 import { LINES } from "./constants";
 import { PrintSpecFields } from "@/components/PrintSpecFields";
@@ -29,6 +29,8 @@ export function NewOrderForm({
   const bad = (name: string) => (state.field === name ? { "aria-invalid": true, style: { borderColor: "var(--bad)" } } : {});
   // Re-mount the fields with the submitted values after an error, so nothing typed is lost.
   const formKey = JSON.stringify(v);
+  // New-customer fields only show while "Novo cliente" is picked.
+  const [customerId, setCustomerId] = useState(v.customer_id ?? "");
 
   return (
     <form action={action} key={formKey} noValidate onInput={(e) => fillFromCatalog(e, catalog, adjustments)}>
@@ -40,27 +42,38 @@ export function NewOrderForm({
       ) : null}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Dados da OS</h2>
-        <div className="grid2">
+        <h2 style={{ marginTop: 0, marginBottom: 12 }}>Dados da OS</h2>
+        <div className={technicians.length > 1 ? "os-head os-head-2t" : "os-head"}>
           <div className="field">
-            <label htmlFor="kind">Tipo</label>
-            <select id="kind" name="kind" defaultValue={v.kind ?? "order"}>
-              <option value="order">Ordem de serviço</option>
-              <option value="quote">Orçamento</option>
-            </select>
+            <span className="os-label">Tipo</span>
+            <div className="seg" role="radiogroup" aria-label="Tipo">
+              <label>
+                <input type="radio" name="kind" value="order" defaultChecked={(v.kind ?? "order") === "order"} />
+                Ordem de serviço
+              </label>
+              <label>
+                <input type="radio" name="kind" value="quote" defaultChecked={v.kind === "quote"} />
+                Orçamento
+              </label>
+            </div>
           </div>
           <div className="field">
-            <label htmlFor="attendance_type">Atendimento</label>
-            <select id="attendance_type" name="attendance_type" defaultValue={v.attendance_type ?? "external"}>
-              <option value="external">Externo</option>
-              <option value="internal">Interno</option>
-              <option value="warranty">Garantia</option>
-            </select>
+            <span className="os-label">Atendimento</span>
+            <div className="seg" role="radiogroup" aria-label="Atendimento">
+              {[
+                ["external", "Externo"],
+                ["internal", "Interno"],
+                ["warranty", "Garantia"],
+              ].map(([val, label]) => (
+                <label key={val}>
+                  <input type="radio" name="attendance_type" value={val} defaultChecked={(v.attendance_type ?? "external") === val} />
+                  {label}
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="grid2">
           <div className="field">
-            <label htmlFor="technician_id">Técnico responsável</label>
+            <label htmlFor="technician_id">Técnico</label>
             <select id="technician_id" name="technician_id" defaultValue={v.technician_id ?? ""}>
               <option value="">— Nenhum —</option>
               {technicians.map((t) => (
@@ -70,13 +83,9 @@ export function NewOrderForm({
               ))}
             </select>
           </div>
-          <div className="field">
-            <label htmlFor="delivery_date">Previsão de entrega</label>
-            <input id="delivery_date" name="delivery_date" type="date" defaultValue={v.delivery_date} />
-          </div>
           {technicians.length > 1 ? (
             <div className="field">
-              <label htmlFor="second_technician_id">Segundo técnico (divide a comissão)</label>
+              <label htmlFor="second_technician_id" title="O segundo técnico divide a comissão">2º técnico (comissão)</label>
               <select id="second_technician_id" name="second_technician_id" defaultValue={v.second_technician_id ?? ""}>
                 <option value="">— Nenhum —</option>
                 {technicians.map((t) => (
@@ -87,45 +96,55 @@ export function NewOrderForm({
               </select>
             </div>
           ) : null}
+          <div className="field">
+            <label htmlFor="delivery_date">Previsão de entrega</label>
+            <input id="delivery_date" name="delivery_date" type="date" defaultValue={v.delivery_date} />
+          </div>
         </div>
-        <div className="field">
-          <label htmlFor="customer_id">Cliente cadastrado</label>
-          <select id="customer_id" name="customer_id" defaultValue={v.customer_id ?? ""}>
-            <option value="">— Novo cliente (preencha abaixo) —</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid2">
+        <div className={customerId ? "os-row os-row-1" : "os-row os-cust"}>
           <div className="field">
-            <label htmlFor="customer_name">Nome do novo cliente</label>
-            <input id="customer_name" name="customer_name" defaultValue={v.customer_name} {...bad("customer_name")} />
+            <label htmlFor="customer_id">Cliente</label>
+            <select id="customer_id" name="customer_id" value={customerId} onChange={(e) => setCustomerId(e.currentTarget.value)}>
+              <option value="">— Novo cliente —</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="field">
-            <label htmlFor="customer_doc">CPF/CNPJ (o Asaas exige para cobrar)</label>
-            <input id="customer_doc" name="customer_doc" inputMode="numeric" defaultValue={v.customer_doc} {...bad("customer_doc")} />
-          </div>
-          <div className="field">
-            <label htmlFor="customer_email">E-mail</label>
-            <input id="customer_email" name="customer_email" type="email" defaultValue={v.customer_email} />
-          </div>
-          <div className="field">
-            <label htmlFor="customer_phone">Celular</label>
-            <input id="customer_phone" name="customer_phone" inputMode="tel" defaultValue={v.customer_phone} />
-          </div>
+          {!customerId ? (
+            <>
+              <div className="field">
+                <label htmlFor="customer_name">Nome do novo cliente</label>
+                <input id="customer_name" name="customer_name" defaultValue={v.customer_name} {...bad("customer_name")} />
+              </div>
+              <div className="field">
+                <label htmlFor="customer_doc" title="O Asaas exige CPF/CNPJ para cobrar">
+                  CPF/CNPJ <span className="muted">(para cobrar)</span>
+                </label>
+                <input id="customer_doc" name="customer_doc" inputMode="numeric" defaultValue={v.customer_doc} {...bad("customer_doc")} />
+              </div>
+              <div className="field">
+                <label htmlFor="customer_phone">Celular</label>
+                <input id="customer_phone" name="customer_phone" inputMode="tel" defaultValue={v.customer_phone} />
+              </div>
+              <div className="field">
+                <label htmlFor="customer_email">E-mail</label>
+                <input id="customer_email" name="customer_email" type="email" defaultValue={v.customer_email} />
+              </div>
+            </>
+          ) : null}
         </div>
         <PrintSpecFields d={readPrintSpec((k) => v[k] ?? "", v.art_approved_at ?? "")} />
-        <div className="grid2">
+        <div className="os-row os-row-2 os-notes">
           <div className="field">
             <label htmlFor="notes">Observações (saem na OS do cliente)</label>
-            <textarea id="notes" name="notes" defaultValue={v.notes} />
+            <textarea id="notes" name="notes" rows={2} defaultValue={v.notes} />
           </div>
           <div className="field">
             <label htmlFor="internal_notes">Observações internas (só a equipe vê)</label>
-            <textarea id="internal_notes" name="internal_notes" defaultValue={v.internal_notes} />
+            <textarea id="internal_notes" name="internal_notes" rows={2} defaultValue={v.internal_notes} />
           </div>
         </div>
       </div>
