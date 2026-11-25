@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 import { addMonths, parseBRL, splitInstallments, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
+import { AsaasError } from "@/lib/asaas";
+import { asaasFor, syncChargeFromAsaas } from "@/lib/charges";
+import { cancelPosCharge } from "@/lib/pos-db";
 
 function back(path: string, key: "error" | "ok", msg: string): never {
   redirect(`${path}${path.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(msg)}`);
@@ -133,7 +136,7 @@ const GROUP_ERRORS: Record<string, string> = {
   walk_in_customer: "Contas de Consumidor final não podem ser agrupadas: cadastre o cliente.",
   not_open: "Só contas em aberto e sem pagamento parcial podem ser agrupadas.",
   already_group: "Uma das contas marcadas já é uma cobrança agrupada.",
-  live_charge: "Uma das contas já tem cobrança ativa (Pix, boleto ou maquininha). Cancele essa cobrança antes de agrupar.",
+  live_charge: "Uma das contas ainda tem cobrança ativa (Pix, boleto ou maquininha) que não pôde ser cancelada. Confira em \"Consultar no Asaas\" e tente de novo.",
   group_paid: "Esta cobrança agrupada já tem pagamento: estorne antes de desagrupar.",
 };
 const groupError = (m: string | undefined) => GROUP_ERRORS[Object.keys(GROUP_ERRORS).find((k) => (m ?? "").includes(k)) ?? ""];
@@ -152,9 +155,58 @@ export async function groupSelected(form: FormData) {
   const name = String(form.get("group_name") ?? "").trim().slice(0, 200) || null;
   const ctx = await requireOrg();
   if (!ctx.can("finance.receive") && !ctx.can("finance.edit")) back(path, "error", GROUP_ERRORS.permission_denied);
-  const { data, error } = await ctx.sb.rpc("group_receivables", { p_org: ctx.orgId, p_ids: ids, p_due: due, p_method: method, p_name: name });
+  const { sb, orgId } = ctx;
+
+  // Check everything that does not depend on the charges first, so nothing is cancelled for a grouping that would fail.
+  const { data: recs } = await sb.from("receivables").select("id, name, customer_id, status, paid_cents, origin_type, customers(name)").eq("org_id", orgId).in("id", ids);
+  if ((recs ?? []).length !== ids.length) back(path, "error", GROUP_ERRORS.not_found);
+  const customers = new Set((recs ?? []).map((r) => r.customer_id as string | null));
+  if (customers.size !== 1 || customers.has(null)) back(path, "error", GROUP_ERRORS.same_customer);
+  if ((recs ?? []).some((r) => (r.customers as unknown as { name: string } | null)?.name === "Consumidor final")) back(path, "error", GROUP_ERRORS.walk_in_customer);
+  if ((recs ?? []).some((r) => r.status !== "open" || Number(r.paid_cents) > 0)) back(path, "error", GROUP_ERRORS.not_open);
+  if ((recs ?? []).some((r) => r.origin_type === "grouping")) back(path, "error", GROUP_ERRORS.already_group);
+  const nameOf = new Map((recs ?? []).map((r) => [r.id as string, r.name as string]));
+
+  // Live charges of the marked accounts are cancelled here, so the customer never pays an item twice.
+  const { data: live } = await sb.from("charges").select("id, receivable_id, asaas_payment_id, status").in("receivable_id", ids).in("status", ["pending", "overdue", "confirmed"]);
+  const confirmed = (live ?? []).find((c) => c.status === "confirmed");
+  if (confirmed) back(path, "error", `${nameOf.get(confirmed.receivable_id as string)}: o cartão já foi aprovado no Asaas (aguardando crédito). Ela não pode entrar no grupo.`);
+  let cancelled = 0;
+  if ((live ?? []).length) {
+    const asaas = await asaasFor(orgId);
+    if (!asaas) back(path, "error", "Há cobrança aberta no Asaas, mas o Asaas não está conectado para cancelá-la.");
+    for (const c of live ?? []) {
+      try {
+        await asaas.deletePayment(c.asaas_payment_id as string);
+      } catch (e) {
+        await syncChargeFromAsaas(orgId, asaas, c.asaas_payment_id as string).catch(() => undefined);
+        back(
+          path,
+          "error",
+          `${nameOf.get(c.receivable_id as string)}: ${e instanceof AsaasError ? `o Asaas não deixou cancelar a cobrança (${e.message}); ela pode já ter sido paga` : "não foi possível cancelar a cobrança no Asaas"}. Nada foi agrupado.`,
+        );
+      }
+      await sb.from("charges").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", c.id);
+      cancelled++;
+    }
+  }
+  const { data: pos } = await sb.from("pos_charges").select("id, receivable_id").in("receivable_id", ids).eq("status", "pending");
+  for (const p of pos ?? []) {
+    try {
+      await cancelPosCharge(orgId, p.id as string);
+      cancelled++;
+    } catch {
+      back(path, "error", `${nameOf.get(p.receivable_id as string)}: não foi possível tirar o valor da maquininha. Use "Tirar da maquininha" e tente de novo.`);
+    }
+  }
+
+  const { data, error } = await sb.rpc("group_receivables", { p_org: orgId, p_ids: ids, p_due: due, p_method: method, p_name: name });
   if (error || !data) back(path, "error", groupError(error?.message) ?? "Não foi possível agrupar.");
-  back(`/receber/${data}`, "ok", `${ids.length} contas agrupadas numa cobrança só. Gere o Pix, boleto ou link abaixo e envie ao cliente.`);
+  back(
+    `/receber/${data}`,
+    "ok",
+    `${ids.length} contas agrupadas numa cobrança só.${cancelled ? ` ${cancelled} cobrança(s) que estavam abertas foram canceladas.` : ""} Gere o Pix, boleto ou link abaixo e envie ao cliente.`,
+  );
 }
 
 /** Undoes a grouping that has no payment and no live charge: the items go back to open. */
