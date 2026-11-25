@@ -8,7 +8,7 @@ declare
   v_method text := coalesce(nullif(p->>'method', ''), 'cash');
   v_pay boolean := coalesce((p->>'pay_now')::boolean, true);
   v_tech uuid := nullif(p->>'technician_id', '')::uuid;
-  v_plan jsonb := p->'plan';
+  v_plan jsonb := nullif(p->'plan', 'null'::jsonb);
   v_days int[]; v_n int := 1; v_first date; v_base bigint; v_i int;
   v_id uuid; v_total bigint; v_today date; v_rec uuid; v_bank uuid;
 begin

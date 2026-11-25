@@ -81,7 +81,8 @@ export async function createSale(_prev: SaleState, form: FormData): Promise<Sale
       discount_cents: discount,
       method,
       pay_now: payNow,
-      plan,
+      // Only a sale on credit carries a plan (a JSON null here once read as "a plan" and blocked cash sales).
+      ...(plan ? { plan } : {}),
       card_installments: Number(values.card_installments || 1),
       reference: (values.reference ?? "").trim() || null,
       notes: (values.notes ?? "").trim() || null,
