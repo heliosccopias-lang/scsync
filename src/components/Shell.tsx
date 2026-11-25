@@ -55,6 +55,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
           {ok("/vendas/nova") ? <Link href="/vendas/nova">Venda no balcão</Link> : null}
           {group("Financeiro", [
             ["/receber", "Contas a receber"],
+            ["/avisos", "Avisos por WhatsApp (cobrança e OS pronta)"],
             ["/pagar", "Contas a pagar"],
             ["/conciliacao", "Conciliação bancária"],
             ["/cartoes", "Conciliação de cartão de crédito"],
@@ -79,7 +80,7 @@ export async function Shell({ children }: { orgName?: string; children: React.Re
             ["/configuracoes/maquininhas", "Maquininhas (Stone, Mercado Pago, PagBank)"],
             ["/configuracoes/financeiro", "Juros, categorias e condições"],
             ["/configuracoes/cartoes", "Cartões de crédito"],
-            ["/configuracoes/whatsapp", "Robô de WhatsApp"],
+            ["/configuracoes/whatsapp", "WhatsApp da empresa (robô e avisos)"],
           ])}
           {ctx.isOwner ? <Link href="/conta">Conta</Link> : null}
         </nav>

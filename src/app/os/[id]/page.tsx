@@ -15,7 +15,9 @@ import { InvoiceRows } from "@/app/notas/InvoiceRows";
 import { cancelTerminal, checkTerminal, sendToTerminal } from "./pos-actions";
 import { PrintSpecFields } from "@/components/PrintSpecFields";
 import { registerOsFiles } from "./files-actions";
-import { stockAction, addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, setStatus, updateCustomer } from "./actions";
+import { stockAction, addChecklist, removeAttachment, charge, convertQuote, updateDetails, launch, receiveManual, refresh, reverseSettlement, sendReadyNotice, setStatus, updateCustomer } from "./actions";
+import { readyMessage, whatsappConnected } from "@/lib/notify";
+import { supabaseAdmin } from "@/lib/supabase";
 
 const METHOD: Record<string, string> = {
   pix: "Pix",
@@ -156,6 +158,10 @@ export default async function ServiceOrderPage({
   const publicUrl = `${appUrl}/p/${os.share_token}`;
   const technicianName = (os.technicians as unknown as { name: string } | null)?.name ?? null;
   const secondName = (os.second as unknown as { name: string } | null)?.name ?? null;
+  // "OS pronta" notice: from the company's WhatsApp when connected, otherwise a link that opens WhatsApp with the text.
+  const showReady = os.kind === "order" && ["done", "paid"].includes(os.status) && (can("os.edit") || can("os.status"));
+  const waConnected = showReady ? await whatsappConnected(supabaseAdmin(), orgId) : false;
+  const readyLink = showReady && !waConnected ? await readyMessage(supabaseAdmin(), orgId, id).then((m) => (m ? whatsappLink(m.phone, m.text) : null)) : null;
   const shareWa = whatsappLink(
     (os.customers as unknown as { phone: string | null } | null)?.phone,
     [
@@ -180,6 +186,16 @@ export default async function ServiceOrderPage({
           {shareWa && canPrice ? (
             <a className="btn btn-primary" href={shareWa} target="_blank" rel="noreferrer">
               Enviar {os.kind === "quote" ? "orçamento" : "OS"} por WhatsApp
+            </a>
+          ) : null}
+          {showReady && waConnected ? (
+            <form action={sendReadyNotice}>
+              <input type="hidden" name="id" value={id} />
+              <button className="btn btn-secondary">Avisar cliente: OS pronta</button>
+            </form>
+          ) : showReady && readyLink ? (
+            <a className="btn btn-secondary" href={readyLink} target="_blank" rel="noreferrer">
+              Avisar cliente: OS pronta
             </a>
           ) : null}
           {showNfse && can("fiscal.issue") && os.kind !== "quote" ? (

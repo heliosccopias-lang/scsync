@@ -3,7 +3,10 @@
 import { redirect } from "next/navigation";
 import { AsaasError } from "@/lib/asaas";
 import { deleteAttachment } from "@/lib/attachments";
-import { onlyDigits, isValidCpfCnpj } from "@/lib/br";
+import { onlyDigits, isValidCpfCnpj, whatsappNumber } from "@/lib/br";
+import { notifyOsReady, readyMessage } from "@/lib/notify";
+import { sendWhatsApp } from "@/lib/whatsapp-send";
+import { supabaseAdmin } from "@/lib/supabase";
 import { asaasFor, createChargeForReceivable, syncChargeFromAsaas } from "@/lib/charges";
 import { parseBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
@@ -96,7 +99,14 @@ export async function setStatus(form: FormData) {
         : "OS cancelada. As contas a receber em aberto desta OS foram canceladas.",
     );
   }
-  back(id, "ok", `Status atualizado.${SYNC_SKIPPED[String(sync)] ? " " + SYNC_SKIPPED[String(sync)] : ""}`);
+  // "OS pronta" by WhatsApp when the company turned it on (sent once per OS).
+  let ready = "";
+  if (String(form.get("status")) === "done") {
+    const r = await notifyOsReady(supabaseAdmin(), orgId, id).catch(() => "failed" as const);
+    ready =
+      r === "sent" ? " Cliente avisado pelo WhatsApp." : r === "manual" ? " Aviso de OS pronta aguardando envio em Financeiro → Avisos por WhatsApp." : r === "no_phone" ? " O cliente não tem celular cadastrado para o aviso de OS pronta." : "";
+  }
+  back(id, "ok", `Status atualizado.${SYNC_SKIPPED[String(sync)] ? " " + SYNC_SKIPPED[String(sync)] : ""}${ready}`);
 }
 
 /** Card machine, cash or a Pix straight to the company's account: settle by hand. */
@@ -319,4 +329,28 @@ export async function stockAction(form: FormData) {
     back(id, "error", msg[error.message] ?? "Não foi possível atualizar o estoque.");
   }
   back(id, "ok", op === "launch_stock" ? `Estoque baixado (${data} produto(s)).` : "Estoque devolvido.");
+}
+
+/** "Avisar cliente: OS pronta" button (company with WhatsApp connected): sends now from the company number. */
+export async function sendReadyNotice(form: FormData) {
+  const id = String(form.get("id"));
+  const ctx = await requireOrg();
+  need(ctx, id, "os.edit", "os.status");
+  const admin = supabaseAdmin();
+  const r = await notifyOsReady(admin, ctx.orgId, id, { force: true });
+  if (r === "sent") back(id, "ok", "Cliente avisado pelo WhatsApp.");
+  if (r === "no_phone") back(id, "error", "O cliente não tem celular válido cadastrado (com DDD).");
+  if (r === "duplicate") {
+    // Already notified once: send again only on purpose, from the connected number.
+    const m = await readyMessage(admin, ctx.orgId, id);
+    const to = whatsappNumber(m?.phone);
+    if (!m || !to) back(id, "error", "Não foi possível montar o aviso desta OS.");
+    try {
+      await sendWhatsApp(m.org, to, m.text);
+      back(id, "ok", "Cliente avisado de novo pelo WhatsApp.");
+    } catch {
+      back(id, "error", "O WhatsApp da empresa não respondeu. Tente de novo ou use o link manual.");
+    }
+  }
+  back(id, "error", "O WhatsApp da empresa não respondeu. Tente de novo ou use o link manual.");
 }

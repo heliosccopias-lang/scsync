@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { refreshInvoice } from "@/lib/nfse-db";
 import { syncBankAccount, syncCard } from "@/lib/bank-sync";
 import { syncPosCharge } from "@/lib/pos-db";
+import { runAllReminders } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -88,5 +89,12 @@ export async function GET(req: Request) {
       /* next run */
     }
   }
-  return NextResponse.json({ checked: open?.length ?? 0, invoices, sync, pos: posSynced, results });
+  // Payment reminders by WhatsApp, after the payments above are up to date (who already paid gets nothing).
+  let reminders: Record<string, number> = {};
+  try {
+    reminders = await runAllReminders(admin);
+  } catch {
+    reminders = { error: 1 };
+  }
+  return NextResponse.json({ checked: open?.length ?? 0, invoices, sync, pos: posSynced, results, reminders });
 }
