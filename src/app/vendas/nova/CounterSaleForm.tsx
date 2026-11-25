@@ -232,7 +232,7 @@ export function CounterSaleForm({
           </colgroup>
           <thead>
             <tr>
-              <th>Descrição do produto</th>
+              <th>Descrição do serviço</th>
               <th className="num">Quantidade</th>
               <th className="num">Preço unitário (R$)</th>
               <th className="num">Valor total</th>
@@ -247,7 +247,7 @@ export function CounterSaleForm({
                     list="sale-items"
                     autoComplete="off"
                     placeholder={i === 0 ? "Digite ou escolha o produto" : ""}
-                    aria-label={`Descrição do produto ${i + 1}`}
+                    aria-label={`Descrição do serviço ${i + 1}`}
                     style={{ width: "100%" }}
                     defaultValue={v[`item_desc_${i}`]}
                     {...bad(`item_desc_${i}`)}
