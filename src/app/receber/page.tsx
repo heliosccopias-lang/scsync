@@ -1,10 +1,17 @@
 import Link from "next/link";
+import { SelectAll } from "./SelectAll";
 import { Notice, PaymentPill, Shell } from "@/components/Shell";
 import { TitleForm } from "@/components/TitleForm";
 import { METHOD_LABEL, fmtDate } from "@/lib/format";
 import { formatBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
-import { settleSelected } from "./actions";
+import { groupSelected, settleSelected } from "./actions";
+
+/** Last day of the month of an ISO date (default due date of a monthly grouped charge). */
+function endOfMonth(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
 
 export default async function ReceivablesPage({
   searchParams,
@@ -25,7 +32,7 @@ export default async function ReceivablesPage({
 
   let query = sb
     .from("receivables_view")
-    .select("id, name, customer_id, due_date, amount_cents, paid_cents, open_cents, status, overdue, origin_type, origin_id, method")
+    .select("id, name, customer_id, due_date, amount_cents, paid_cents, open_cents, status, overdue, origin_type, origin_id, method, grouped_into_id")
     .eq("org_id", orgId)
     .order("due_date")
     .limit(500);
@@ -35,6 +42,7 @@ export default async function ReceivablesPage({
   if (situacao === "hoje") query = query.in("status", ["open", "partial"]).eq("due_date", today);
   if (situacao === "pago") query = query.eq("status", "paid");
   if (situacao === "cancelado") query = query.eq("status", "cancelled");
+  if (situacao === "agrupado") query = query.eq("status", "grouped");
   if (cliente) query = query.eq("customer_id", cliente);
   if (q) {
     // The search box finds the customer's name or CPF/CNPJ, the description or the document number.
@@ -76,7 +84,7 @@ export default async function ReceivablesPage({
     return `/receber?${p.toString()}`;
   };
   const totalOpen = rows.reduce((a, r) => a + (["open", "partial"].includes(r.status) ? Number(r.open_cents) : 0), 0);
-  const selectable = situacao !== "pago" && situacao !== "cancelado" && can("finance.receive");
+  const selectable = !["pago", "cancelado", "agrupado"].includes(situacao) && can("finance.receive");
 
   return (
     <Shell orgName={orgName}>
@@ -93,6 +101,7 @@ export default async function ReceivablesPage({
           <option value="atraso">Em atraso (vencidas)</option>
           <option value="hoje">Vencem hoje</option>
           <option value="pago">Pagas</option>
+          <option value="agrupado">Agrupadas numa cobrança</option>
           <option value="cancelado">Canceladas</option>
           <option value="todas">Todas</option>
         </select>
@@ -161,7 +170,11 @@ export default async function ReceivablesPage({
           <table>
             <thead>
               <tr>
-                {selectable ? <th style={{ width: 30 }}></th> : null}
+                {selectable ? (
+                  <th style={{ width: 30 }}>
+                    <SelectAll />
+                  </th>
+                ) : null}
                 <th>Descrição</th>
                 <th>Cliente</th>
                 <th>Vencimento</th>
@@ -182,6 +195,12 @@ export default async function ReceivablesPage({
                   ) : null}
                   <td>
                     <Link href={`/receber/${r.id}`}>{r.name}</Link>
+                    {r.origin_type === "grouping" ? <span className="pill pill-open" style={{ marginLeft: 6 }}>Agrupada</span> : null}
+                    {r.status === "grouped" && r.grouped_into_id ? (
+                      <Link href={`/receber/${r.grouped_into_id}`} className="muted" style={{ fontSize: 12, marginLeft: 6 }}>
+                        (na cobrança agrupada)
+                      </Link>
+                    ) : null}
                     {r.origin_type === "service_order" ? (
                       <>
                         {" "}
@@ -214,6 +233,28 @@ export default async function ReceivablesPage({
               </select>
               <input type="date" name="paid_on" defaultValue={todayInSaoPaulo()} aria-label="Data" style={{ width: 160 }} />
               <button className="btn btn-primary">Dar baixa pelo valor em aberto</button>
+            </div>
+          ) : null}
+          {selectable ? (
+            <div className="card" style={{ marginTop: 10 }}>
+              <strong>Agrupar as marcadas em uma cobrança</strong>
+              <p className="muted" style={{ margin: "4px 0 8px", fontSize: 13 }}>
+                Para clientes com serviços recorrentes: filtre pelo cliente e pelo período, marque as contas do mês e gere uma cobrança só (Pix, boleto ou
+                link de cartão). Quando ela for paga, todas as OS do grupo ficam pagas.
+              </p>
+              <div className="row" style={{ gap: 8 }}>
+                <input type="date" name="group_due" defaultValue={endOfMonth(today)} aria-label="Vencimento da cobrança agrupada" style={{ width: 160 }} />
+                <select name="group_method" defaultValue="pix" aria-label="Forma da cobrança agrupada" style={{ width: 200 }}>
+                  <option value="pix">Pix</option>
+                  <option value="boleto">Boleto (com QR Pix)</option>
+                  <option value="credit_card">Cartão de crédito (link)</option>
+                  <option value="other">Cliente escolhe</option>
+                </select>
+                <input name="group_name" placeholder="Descrição (opcional): Fatura de novembro" style={{ width: 280 }} />
+                <button className="btn btn-primary" formAction={groupSelected}>
+                  Agrupar e gerar cobrança
+                </button>
+              </div>
             </div>
           ) : null}
         </form>

@@ -111,6 +111,8 @@ export async function cancelTitle(form: FormData) {
     .maybeSingle<{ id: string; paid_cents: number; status: string; origin_type?: string }>();
   if (!t) back(path, "error", "Conta não encontrada.");
   if (t.origin_type === "service_order") back(path, "error", "Esta parcela é de uma OS: cancele a OS em vez da parcela.");
+  if (t.origin_type === "grouping") back(path, "error", "Esta é uma cobrança agrupada: use \"Desagrupar\" para devolver as contas ao aberto.");
+  if (t.status === "grouped") back(path, "error", "Esta conta está numa cobrança agrupada: desagrupe antes.");
   if (t.paid_cents > 0) back(path, "error", "Esta conta tem pagamento registrado: estorne antes de cancelar.");
   if (kind === "receivable") {
     const { data: live } = await sb.from("charges").select("id").eq("receivable_id", t.id).in("status", ["pending", "overdue"]).maybeSingle();
@@ -119,4 +121,47 @@ export async function cancelTitle(form: FormData) {
   const { error } = await sb.from(table).update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", t.id);
   if (error) back(path, "error", "Não foi possível cancelar.");
   back(path, "ok", "Conta cancelada.");
+}
+
+const GROUP_ERRORS: Record<string, string> = {
+  permission_denied: "Seu perfil não agrupa cobranças.",
+  need_two: "Marque pelo menos duas contas do mesmo cliente para agrupar.",
+  invalid_method: "Escolha a forma de cobrança do grupo.",
+  due_required: "Informe o vencimento da cobrança agrupada.",
+  not_found: "Alguma conta marcada não foi encontrada.",
+  same_customer: "Só dá para agrupar contas do mesmo cliente. Filtre pelo cliente e marque de novo.",
+  walk_in_customer: "Contas de Consumidor final não podem ser agrupadas: cadastre o cliente.",
+  not_open: "Só contas em aberto e sem pagamento parcial podem ser agrupadas.",
+  already_group: "Uma das contas marcadas já é uma cobrança agrupada.",
+  live_charge: "Uma das contas já tem cobrança ativa (Pix, boleto ou maquininha). Cancele essa cobrança antes de agrupar.",
+  group_paid: "Esta cobrança agrupada já tem pagamento: estorne antes de desagrupar.",
+};
+const groupError = (m: string | undefined) => GROUP_ERRORS[Object.keys(GROUP_ERRORS).find((k) => (m ?? "").includes(k)) ?? ""];
+
+/**
+ * "Agrupar em uma cobrança": the marked open receivables of ONE customer become a single receivable
+ * (e.g. the month's recurring jobs), charged once. Opens the new receivable to generate Pix/boleto/link.
+ */
+export async function groupSelected(form: FormData) {
+  const path = String(form.get("return_to") || "/receber");
+  const ids = [...new Set(form.getAll("ids").map(String))];
+  if (ids.length < 2) back(path, "error", GROUP_ERRORS.need_two);
+  const due = String(form.get("group_due") || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) back(path, "error", GROUP_ERRORS.due_required);
+  const method = ["pix", "boleto", "credit_card", "other"].includes(String(form.get("group_method"))) ? String(form.get("group_method")) : "pix";
+  const name = String(form.get("group_name") ?? "").trim().slice(0, 200) || null;
+  const ctx = await requireOrg();
+  if (!ctx.can("finance.receive") && !ctx.can("finance.edit")) back(path, "error", GROUP_ERRORS.permission_denied);
+  const { data, error } = await ctx.sb.rpc("group_receivables", { p_org: ctx.orgId, p_ids: ids, p_due: due, p_method: method, p_name: name });
+  if (error || !data) back(path, "error", groupError(error?.message) ?? "Não foi possível agrupar.");
+  back(`/receber/${data}`, "ok", `${ids.length} contas agrupadas numa cobrança só. Gere o Pix, boleto ou link abaixo e envie ao cliente.`);
+}
+
+/** Undoes a grouping that has no payment and no live charge: the items go back to open. */
+export async function ungroup(form: FormData) {
+  const id = String(form.get("id"));
+  const ctx = await requireOrg();
+  const { data, error } = await ctx.sb.rpc("ungroup_receivable", { p_group: id });
+  if (error) back(`/receber/${id}`, "error", groupError(error.message) ?? "Não foi possível desagrupar.");
+  back("/receber", "ok", `Cobrança desagrupada: ${data} conta(s) voltaram a ficar em aberto.`);
 }

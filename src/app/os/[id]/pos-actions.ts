@@ -7,7 +7,9 @@ import { PosError, cancelPosCharge, sendToPos, syncPosCharge } from "@/lib/pos-d
 import type { supabaseAdmin } from "@/lib/supabase";
 
 function back(id: string, key: "error" | "ok", msg: string): never {
-  redirect(`/os/${id}?${key}=${encodeURIComponent(msg)}`);
+  // `id` is an OS id, or a page path (e.g. /receber/<id>) when called from another screen.
+  const base = id.startsWith("/") && !id.startsWith("//") ? id : `/os/${id}`;
+  redirect(`${base}?${key}=${encodeURIComponent(msg)}`);
 }
 
 export async function sendToTerminal(form: FormData) {

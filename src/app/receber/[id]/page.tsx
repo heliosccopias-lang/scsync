@@ -9,7 +9,8 @@ import { ASAAS_MIN_CHARGE_CENTS } from "@/lib/constants";
 import { METHOD_LABEL, fmtDate } from "@/lib/format";
 import { formatBRL, todayInSaoPaulo } from "@/lib/money";
 import { requireOrg } from "@/lib/session";
-import { cancelTitle } from "../actions";
+import { cancelTitle, ungroup } from "../actions";
+import { sendToTerminal } from "@/app/os/[id]/pos-actions";
 
 export default async function ReceivableDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; ok?: string }> }) {
   const { id } = await params;
@@ -26,6 +27,15 @@ export default async function ReceivableDetail({ params, searchParams }: { param
   const [{ data: charges }, { data: settlements }] = await Promise.all([
     sb.from("charges").select("*").eq("receivable_id", id).order("created_at", { ascending: false }),
     sb.from("settlements").select("*").eq("receivable_id", id).order("created_at"),
+  ]);
+  // A grouped charge lists what is inside it; a grouped item points to its group.
+  const isGroup = r.origin_type === "grouping";
+  const [{ data: items }, { data: parent }, { data: terminals }] = await Promise.all([
+    isGroup
+      ? sb.from("receivables").select("id, name, due_date, amount_cents, origin_type, origin_id").eq("grouped_into_id", id).order("due_date")
+      : Promise.resolve({ data: [] as { id: string; name: string; due_date: string; amount_cents: number; origin_type: string; origin_id: string | null }[] }),
+    r.grouped_into_id ? sb.from("receivables").select("id, name, status").eq("id", r.grouped_into_id).maybeSingle() : Promise.resolve({ data: null }),
+    sb.from("pos_terminals").select("id, name, provider").eq("org_id", orgId).eq("active", true).in("provider", ["stone", "mercadopago"]).order("name"),
   ]);
   const c = (charges ?? [])[0];
   const live = c && ["pending", "overdue", "confirmed"].includes(c.status);
@@ -68,11 +78,16 @@ export default async function ReceivableDetail({ params, searchParams }: { param
         <h1 style={{ margin: 0 }}>
           {r.name} <PaymentPill status={r.overdue ? "overdue" : r.status} />
         </h1>
-        {r.origin_type === "service_order" ? (
+        {isGroup && open && Number(r.paid_cents) === 0 && canReceive ? (
+          <form action={ungroup}>
+            <input type="hidden" name="id" value={id} />
+            <button className="btn btn-secondary">Desagrupar</button>
+          </form>
+        ) : r.origin_type === "service_order" ? (
           <Link href={`/os/${r.origin_id}`} className="btn btn-secondary">
             Ver OS
           </Link>
-        ) : open && r.paid_cents === 0 && can("finance.edit") ? (
+        ) : !isGroup && open && r.paid_cents === 0 && can("finance.edit") ? (
           <form action={cancelTitle}>
             <input type="hidden" name="kind" value="receivable" />
             <input type="hidden" name="id" value={id} />
@@ -82,6 +97,40 @@ export default async function ReceivableDetail({ params, searchParams }: { param
         ) : null}
       </div>
       <Notice error={error} ok={ok} />
+      {r.status === "grouped" && parent ? (
+        <div className="notice notice-warn">
+          Esta conta está dentro da cobrança agrupada <Link href={`/receber/${parent.id}`}>{parent.name}</Link>: cobre e receba por lá.
+        </div>
+      ) : null}
+      {isGroup ? (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <strong>Itens desta cobrança ({(items ?? []).length})</strong>
+          <table style={{ marginTop: 8 }}>
+            <tbody>
+              {(items ?? []).map((it) => (
+                <tr key={it.id}>
+                  <td>
+                    <Link href={`/receber/${it.id}`}>{it.name}</Link>
+                    {it.origin_type === "service_order" && it.origin_id ? (
+                      <>
+                        {" "}
+                        <Link href={`/os/${it.origin_id}`} className="muted" style={{ fontSize: 12 }}>
+                          (ver OS)
+                        </Link>
+                      </>
+                    ) : null}
+                  </td>
+                  <td>{fmtDate(it.due_date)}</td>
+                  <td className="num">{formatBRL(it.amount_cents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+            Quando esta cobrança for paga, todas as OS acima ficam pagas. Enquanto não houver pagamento nem cobrança gerada, dá para desagrupar.
+          </p>
+        </div>
+      ) : null}
 
       <div className="card" style={{ marginBottom: 12 }}>
         <dl className="facts">
@@ -161,6 +210,41 @@ export default async function ReceivableDetail({ params, searchParams }: { param
               <input type="hidden" name="receivable_id" value={id} />
               <button className="btn btn-primary">Gerar Pix / cobrança</button>
             </form>
+          ) : null}
+          {(terminals ?? []).length ? (
+            <details style={{ minWidth: 260 }}>
+              <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>
+                Cobrar na maquininha
+              </summary>
+              <form action={sendToTerminal} className="card" style={{ marginTop: 10 }}>
+                <input type="hidden" name="id" value={self} />
+                <input type="hidden" name="receivable_id" value={id} />
+                <div className="field">
+                  <label>Maquininha</label>
+                  <select name="terminal_id">
+                    {(terminals ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.provider === "mercadopago" ? "Mercado Pago" : "Stone"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Forma</label>
+                  <select name="payment_type" defaultValue="any">
+                    <option value="any">Cliente escolhe na maquininha (débito, crédito, Pix)</option>
+                    <option value="debit">Débito</option>
+                    <option value="credit">Crédito</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Parcelas (crédito)</label>
+                  <input name="installments" type="number" min={1} max={18} defaultValue={1} />
+                </div>
+                <input type="hidden" name="amount" value={(r.open_cents / 100).toFixed(2).replace(".", ",")} />
+                <button className="btn btn-primary">Enviar para a maquininha</button>
+              </form>
+            </details>
           ) : null}
           <details style={{ flex: 1, minWidth: 280 }}>
             <summary className="btn btn-secondary" style={{ display: "inline-flex" }}>
