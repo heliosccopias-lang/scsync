@@ -45,7 +45,7 @@ export function EditItemsForm({
         </div>
       ) : null}
       <p className="muted" style={{ marginTop: 0 }}>
-        Altere, inclua ou apague linhas (deixe a descrição vazia para remover). As parcelas são recalculadas com o novo total, mantendo vencimentos e forma. Depois de lançar as contas, a OS fica travada.
+        Altere, inclua ou apague linhas (deixe a descrição vazia para remover). As parcelas e as contas a receber são recalculadas com o novo total, mantendo vencimentos e forma. A OS só trava depois de gerar cobrança, receber um pagamento ou emitir nota fiscal.
       </p>
       <ItemsTable
         rows={rows}

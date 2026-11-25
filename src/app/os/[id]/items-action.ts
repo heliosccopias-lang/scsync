@@ -9,7 +9,8 @@ import { requireOrg } from "@/lib/session";
 export type EditItemsState = { error?: string; field?: string; values?: Record<string, string> };
 
 const ERRORS: Record<string, string> = {
-  already_launched: "As contas desta OS já foram lançadas: os itens não podem mais ser alterados.",
+  already_launched: "Esta OS já tem pagamento ou cobrança: os itens não podem mais ser alterados.",
+  locked_by_payment: "Esta OS já tem pagamento recebido, cobrança gerada ou nota fiscal: os itens não podem mais ser alterados.",
   cancelled: "OS cancelada não pode ser alterada.",
   total_not_positive: "O total da OS precisa ser maior que zero (confira o desconto).",
   total_below_installments: "O total ficou menor que o número de parcelas.",
@@ -40,6 +41,9 @@ export async function updateItems(_prev: EditItemsState, form: FormData): Promis
     p_discount_cents: discount,
   });
   if (error) return fail(ERRORS[error.message.split(":")[0]] ?? "Não foi possível salvar os itens.");
+
+  // Receivables follow the new total (nothing was charged or paid yet, or the edit would have been refused).
+  await sb.rpc("sync_os_accounts", { p_service_order: id });
 
   const result = data as { total: number; changed: { receivable_id: string; amount_cents: number; due_date: string }[]; added_receivable_id?: string | null };
   const counts: Record<ChargeSyncResult, number> = { none: 0, updated: 0, recreated: 0, cancelled_below_min: 0, failed: 0 };

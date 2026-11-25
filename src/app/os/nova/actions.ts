@@ -97,5 +97,7 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
   const extra: Record<string, unknown> = { ...readPrintSpec(s, todayInSaoPaulo()) };
   if (s("second_technician_id")) extra.second_technician_id = s("second_technician_id");
   if (Object.keys(extra).length) await sb.from("service_orders").update(extra).eq("id", osId).eq("org_id", orgId);
+  // Accounts receivable are launched right away (quotes are skipped); the OS stays editable until it is charged or paid.
+  await sb.rpc("sync_os_accounts", { p_service_order: osId });
   redirect(`/os/${osId}`);
 }

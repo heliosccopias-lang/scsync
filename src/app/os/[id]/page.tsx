@@ -147,6 +147,9 @@ export default async function ServiceOrderPage({
 
   const customer = os.customers as unknown as { id: string; name: string; cpf_cnpj: string | null; email: string | null; phone: string | null };
   const launched = Boolean(os.accounts_launched_at);
+  // The OS is frozen only once money or a charge is involved (payment, live Pix/boleto/card-machine charge, NFS-e).
+  const { data: lockData } = await sb.rpc("os_financial_lock", { p_os: id });
+  const locked = Boolean(lockData);
   const total = (receivables ?? []).length;
 
   const appUrl = process.env.APP_URL ?? "https://scsync.vercel.app";
@@ -216,7 +219,7 @@ export default async function ServiceOrderPage({
         <div className="notice" style={{ background: "var(--orange-soft)", color: "var(--ink)" }}>
           <div className="spread" style={{ marginBottom: 0 }}>
             <span>
-              <strong>Orçamento.</strong> Envie ao cliente; quando ele aprovar, converta em ordem de serviço para lançar as contas e cobrar.
+              <strong>Orçamento.</strong> Envie ao cliente; quando ele aprovar, converta em ordem de serviço: as contas a receber são lançadas na hora.
             </span>
             {canEdit ? (
               <form action={convertQuote}>
@@ -429,9 +432,9 @@ export default async function ServiceOrderPage({
         </tbody>
       </table>
 
-      {launched ? (
+      {locked ? (
         <p className="muted" style={{ marginTop: 10 }}>
-          Contas lançadas em {new Date(os.accounts_launched_at).toLocaleDateString("pt-BR")}: os serviços e produtos desta OS não podem mais ser alterados.
+          🔒 Esta OS já tem pagamento recebido, cobrança gerada ou nota fiscal: os serviços e produtos não podem mais ser alterados.
         </p>
       ) : os.status !== "cancelled" && canEdit ? (
         <details style={{ marginTop: 12 }}>
@@ -559,20 +562,25 @@ export default async function ServiceOrderPage({
       <>
       <div className="spread" style={{ marginTop: 28 }}>
         <h2 style={{ margin: 0 }}>Pagamento</h2>
-        {!launched && os.kind !== "quote" && (installments ?? []).length > 0 && canEdit ? (
+        {!launched && os.kind !== "quote" && os.status !== "cancelled" && (installments ?? []).length > 0 && canEdit ? (
           <form action={launch} className="row">
             <input type="hidden" name="id" value={id} />
-            <span className="muted" style={{ fontSize: 13 }}>Depois de lançar, os itens da OS ficam travados.</span>
+            <span className="muted" style={{ fontSize: 13 }}>As contas não foram lançadas automaticamente.</span>
             <button className="btn btn-primary">Lançar contas</button>
           </form>
+        ) : launched && !locked && canEdit ? (
+          <span className="muted" style={{ fontSize: 13 }}>Contas lançadas automaticamente · a OS pode ser editada até a cobrança ou o pagamento.</span>
         ) : null}
       </div>
 
       {!launched ? (
         <>
           <p className="muted" style={{ marginTop: 0 }}>
-            Clique em <strong>Lançar contas</strong> para transformar as parcelas abaixo em contas a receber. Depois você escolhe, em cada parcela, se cobra
-            pelo Asaas (Pix, boleto, cartão online) ou se recebe na maquininha ou em dinheiro.
+            {os.kind === "quote"
+              ? "Orçamento: as parcelas abaixo viram contas a receber quando ele for aprovado e convertido em ordem de serviço."
+              : os.status === "cancelled"
+                ? "OS cancelada: as parcelas abaixo não estão em contas a receber."
+                : "As parcelas abaixo ainda não estão em contas a receber. Use \"Lançar contas\" depois de resolver o aviso acima."}
           </p>
           <table>
             <thead>

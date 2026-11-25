@@ -20,21 +20,28 @@ function need(ctx: { can: (p: string) => boolean }, id: string, ...anyOf: string
   if (!anyOf.some((p) => ctx.can(p))) back(id, "error", "Seu perfil não permite esta ação.");
 }
 
-const ERRORS: Record<string, string> = {
-  already_launched: "As contas desta OS já foram lançadas.",
-  no_installments: "A OS não tem parcelas.",
-  installments_sum_mismatch: "A soma das parcelas não bate com o total da OS.",
-  cancelled: "OS cancelada.",
-  is_quote: "Isto é um orçamento: aprove e converta em OS antes de lançar as contas.",
+/** Why sync_os_accounts could not launch the receivables, in plain words. */
+const SYNC_SKIPPED: Record<string, string> = {
+  skipped_bank_account: "Cadastre uma conta bancária ou caixa em Configurações → Contas bancárias para lançar as contas desta OS.",
+  skipped_installments_mismatch: "A soma das parcelas não bate com o total da OS: ajuste os itens para as contas serem lançadas.",
+  skipped_no_installments: "A OS não tem parcelas.",
+  skipped_no_total: "O total da OS precisa ser maior que zero.",
 };
 
+/** Keeps the receivables in line with the OS (launch, re-launch, cancel). Returns a note when it could not. */
+async function syncAccounts(sb: Awaited<ReturnType<typeof requireOrg>>["sb"], id: string): Promise<string | null> {
+  const { data, error } = await sb.rpc("sync_os_accounts", { p_service_order: id });
+  if (error) return "Não foi possível atualizar as contas a receber desta OS.";
+  return SYNC_SKIPPED[String(data)] ?? null;
+}
+
+/** Fallback for an OS whose accounts could not be launched on save (e.g. no bank account then). */
 export async function launch(form: FormData) {
   const id = String(form.get("id"));
   const ctx = await requireOrg();
-  const { sb } = ctx;
   need(ctx, id, "os.edit");
-  const { error } = await sb.rpc("launch_accounts", { p_service_order: id });
-  if (error) back(id, "error", ERRORS[error.message.split(":")[0]] ?? "Não foi possível lançar as contas.");
+  const note = await syncAccounts(ctx.sb, id);
+  if (note) back(id, "error", note);
   back(id, "ok", "Contas lançadas em contas a receber.");
 }
 
@@ -77,7 +84,19 @@ export async function setStatus(form: FormData) {
     .eq("id", id)
     .eq("org_id", orgId);
   if (error) back(id, "error", "Status inválido.");
-  back(id, "ok", "Status atualizado.");
+  // Cancelling drops the open receivables; reopening launches them again (only for who edits the OS).
+  if (!ctx.can("os.edit")) back(id, "ok", "Status atualizado.");
+  const { data: sync } = await sb.rpc("sync_os_accounts", { p_service_order: id });
+  if (String(form.get("status")) === "cancelled") {
+    back(
+      id,
+      "ok",
+      sync === "locked"
+        ? "OS cancelada. Ela já tinha pagamento ou cobrança: confira as contas a receber e cancele ou estorne o que for preciso."
+        : "OS cancelada. As contas a receber em aberto desta OS foram canceladas.",
+    );
+  }
+  back(id, "ok", `Status atualizado.${SYNC_SKIPPED[String(sync)] ? " " + SYNC_SKIPPED[String(sync)] : ""}`);
 }
 
 /** Card machine, cash or a Pix straight to the company's account: settle by hand. */
@@ -251,7 +270,8 @@ export async function convertQuote(form: FormData) {
     .eq("org_id", orgId)
     .eq("kind", "quote");
   if (error || !count) back(id, "error", "Não foi possível converter o orçamento.");
-  back(id, "ok", "Orçamento aprovado e convertido em ordem de serviço. Agora você pode lançar as contas.");
+  const note = await syncAccounts(sb, id);
+  back(id, "ok", `Orçamento aprovado e convertido em ordem de serviço.${note ? " " + note : " As contas a receber foram lançadas."}`);
 }
 
 export async function addChecklist(form: FormData) {
