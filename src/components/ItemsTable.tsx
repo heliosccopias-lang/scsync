@@ -25,8 +25,14 @@ export function ItemsTable({
   discountDefault,
   discountId = "discount",
   firstPlaceholder = "Digite ou escolha do catálogo",
+  start,
+  addLabel = "+ Adicionar serviço",
 }: {
+  /** Most lines the form takes (the server reads this many). */
   rows: number;
+  /** Lines shown at first; "+ Adicionar serviço" shows more up to rows. Default: all of them. */
+  start?: number;
+  addLabel?: string;
   initial: (i: number) => ItemRow;
   bad: (name: string) => object;
   discountDefault: string;
@@ -36,6 +42,16 @@ export function ItemsTable({
   const box = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<number[]>(() => Array(rows).fill(0));
   const [discount, setDiscount] = useState(0);
+  // Visible lines: the start count, or enough to show every line that already has something in it.
+  const [shown, setShown] = useState(() => {
+    if (start === undefined) return rows;
+    let last = -1;
+    for (let i = 0; i < rows; i++) {
+      const it = initial(i);
+      if (it.desc.trim() || it.price.trim()) last = i;
+    }
+    return Math.min(rows, Math.max(start, last + 1));
+  });
 
   const recalc = useCallback(() => {
     const el = box.current;
@@ -81,7 +97,7 @@ export function ItemsTable({
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: rows }, (_, i) => {
+            {Array.from({ length: shown }, (_, i) => {
               const it = initial(i);
               return (
                 <tr key={i}>
@@ -132,6 +148,11 @@ export function ItemsTable({
           </tbody>
         </table>
       </div>
+      {shown < rows ? (
+        <button type="button" className="btn btn-secondary" style={{ marginTop: 8, padding: "4px 12px", fontSize: 13 }} onClick={() => setShown((n) => Math.min(rows, n + 1))}>
+          {addLabel}
+        </button>
+      ) : null}
 
       <div className="items-totals">
         <div>

@@ -2,7 +2,7 @@
 
 import { useActionState, useState, type FormEvent } from "react";
 import { createOrder, type FormState } from "./actions";
-import { LINES } from "./constants";
+import { LINES, START_LINES } from "./constants";
 import { PrintSpecFields } from "@/components/PrintSpecFields";
 import { readPrintSpec } from "@/lib/grafica";
 import { ItemsTable } from "@/components/ItemsTable";
@@ -136,6 +136,25 @@ export function NewOrderForm({
             </>
           ) : null}
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Serviços e produtos</h2>
+        <ItemsTable
+          rows={LINES}
+          start={START_LINES}
+          initial={(i) => ({
+            kind: v[`item_kind_${i}`] ?? "service",
+            desc: v[`item_desc_${i}`] ?? "",
+            qty: v[`item_qty_${i}`] ?? "1",
+            price: v[`item_price_${i}`] ?? "",
+          })}
+          bad={bad}
+          discountDefault={v.discount ?? ""}
+        />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
         <PrintSpecFields d={readPrintSpec((k) => v[k] ?? "", v.art_approved_at ?? "")} />
         <div className="os-row os-row-2 os-notes">
           <div className="field">
@@ -147,21 +166,6 @@ export function NewOrderForm({
             <textarea id="internal_notes" name="internal_notes" rows={2} defaultValue={v.internal_notes} />
           </div>
         </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Serviços e produtos</h2>
-        <ItemsTable
-          rows={LINES}
-          initial={(i) => ({
-            kind: v[`item_kind_${i}`] ?? "service",
-            desc: v[`item_desc_${i}`] ?? "",
-            qty: v[`item_qty_${i}`] ?? "1",
-            price: v[`item_price_${i}`] ?? "",
-          })}
-          bad={bad}
-          discountDefault={v.discount ?? ""}
-        />
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
