@@ -7,6 +7,8 @@ type Row = {
   id: string;
   number: number;
   status: string;
+  contact_name: string | null;
+  contact_phone: string | null;
   os_date: string;
   total_cents: number;
   channel: string;
