@@ -20,7 +20,8 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
   const fail = (error: string, field?: string): FormState => ({ error, field, values });
 
   // 1. Validate everything first; nothing is saved until the whole form is valid.
-  const existingCustomer = s("customer_id");
+  const finalCustomer = s("customer_id") === "final";
+  const existingCustomer = finalCustomer ? "final" : s("customer_id");
   const doc = s("customer_doc").replace(/\D/g, "");
   if (!existingCustomer) {
     if (!s("customer_name")) return fail("Escolha o cliente ou cadastre um novo em \"+ Novo cliente\".", "customer_name");
@@ -61,6 +62,16 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
   const { sb, orgId } = await requireOrg();
   let customerId = existingCustomer;
   let createdCustomer = false;
+  // "Consumidor final": the shared walk-in customer (created once per company); name and phone go on the OS itself.
+  if (finalCustomer) {
+    const { data: fin } = await sb.from("customers").select("id").eq("org_id", orgId).eq("name", "Consumidor final").order("created_at").limit(1).maybeSingle();
+    if (fin) customerId = fin.id as string;
+    else {
+      const { data: made, error: mErr } = await sb.from("customers").insert({ org_id: orgId, name: "Consumidor final" }).select("id").single();
+      if (mErr || !made) return fail("Não foi possível usar o Consumidor final.", "customer_name");
+      customerId = made.id as string;
+    }
+  }
   if (!customerId) {
     const { data, error } = await sb
       .from("customers")
@@ -96,6 +107,10 @@ export async function createOrder(_prev: FormState, form: FormData): Promise<For
   // Extras the creation function does not take: print-shop job specs and the second technician.
   const extra: Record<string, unknown> = { ...readPrintSpec(s, todayInSaoPaulo()) };
   if (s("second_technician_id")) extra.second_technician_id = s("second_technician_id");
+  if (finalCustomer) {
+    if (s("contact_name")) extra.contact_name = s("contact_name").slice(0, 120);
+    if (s("contact_phone")) extra.contact_phone = s("contact_phone").slice(0, 30);
+  }
   if (Object.keys(extra).length) await sb.from("service_orders").update(extra).eq("id", osId).eq("org_id", orgId);
   // Accounts receivable are launched right away (quotes are skipped); the OS stays editable until it is charged or paid.
   await sb.rpc("sync_os_accounts", { p_service_order: osId });

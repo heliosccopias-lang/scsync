@@ -323,9 +323,21 @@ export default async function ServiceOrderPage({
               <input type="hidden" name="id" value={id} />
               {canEdit ? (
               <>
+              {customer?.name === "Consumidor final" ? (
+                <div className="grid2">
+                  <div className="field">
+                    <label htmlFor="d_contact_name">Nome do cliente</label>
+                    <input id="d_contact_name" name="contact_name" defaultValue={os.contact_name ?? ""} maxLength={120} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="d_contact_phone">Telefone / WhatsApp</label>
+                    <input id="d_contact_phone" name="contact_phone" defaultValue={os.contact_phone ?? ""} inputMode="tel" maxLength={30} />
+                  </div>
+                </div>
+              ) : null}
               <div className="grid2">
                 <div className="field">
-                  <label htmlFor="d_tech">Técnico</label>
+                  <label htmlFor="d_tech">Setor</label>
                   <select id="d_tech" name="technician_id" defaultValue={os.technician_id ?? ""}>
                     <option value="">— Nenhum —</option>
                     {(technicians ?? []).map((t) => (
@@ -336,7 +348,7 @@ export default async function ServiceOrderPage({
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor="d_tech2">Segundo técnico</label>
+                  <label htmlFor="d_tech2">Atendente</label>
                   <select id="d_tech2" name="second_technician_id" defaultValue={os.second_technician_id ?? ""}>
                     <option value="">— Nenhum —</option>
                     {(technicians ?? []).map((t) => (

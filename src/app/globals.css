@@ -402,3 +402,6 @@ details.popover > .popover-panel { right: 0; padding-top: 28px; box-shadow: 0 10
 .os-head.os-head-2t { grid-template-columns: auto minmax(140px, 1fr) minmax(140px, 1fr) 160px; }
 .os-row .new-customer > summary, .row .new-customer > summary { height: 38px; padding: 0 14px; display: inline-flex; align-items: center; font-size: 14px; }
 @media (max-width: 760px) { .os-head, .os-head.os-head-2t { grid-template-columns: 1fr 1fr; } .os-cust-pick { grid-template-columns: 1fr auto; } }
+
+.os-cust-final { grid-template-columns: minmax(200px, 300px) minmax(180px, 1fr) minmax(150px, 210px) auto; }
+@media (max-width: 760px) { .os-cust-final { grid-template-columns: 1fr 1fr; } }

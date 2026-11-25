@@ -244,6 +244,8 @@ export async function updateDetails(form: FormData) {
     .update({
       technician_id: s("technician_id"),
       second_technician_id: s("second_technician_id"),
+      // Walk-in contact (only sent when the OS is for "Consumidor final").
+      ...(form.has("contact_name") ? { contact_name: s("contact_name")?.slice(0, 120) ?? null, contact_phone: s("contact_phone")?.slice(0, 30) ?? null } : {}),
       delivery_date: delivery && /^\d{4}-\d{2}-\d{2}$/.test(delivery) ? delivery : null,
       attendance_type: attendance && ["internal", "external", "warranty"].includes(attendance) ? attendance : "external",
       ...readPrintSpec((k) => String(form.get(k) ?? ""), todayInSaoPaulo()),

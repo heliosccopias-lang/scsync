@@ -89,18 +89,33 @@ export function NewOrderForm({
             <input id="delivery_date" name="delivery_date" type="date" defaultValue={v.delivery_date} />
           </div>
         </div>
-        <div className="os-row os-cust-pick">
+        <div className={customerId === "final" ? "os-row os-cust-final" : "os-row os-cust-pick"}>
           <div className="field">
             <label htmlFor="customer_id">Cliente</label>
             <select id="customer_id" name="customer_id" value={customerId} onChange={(e) => setCustomerId(e.currentTarget.value)} {...bad("customer_name")}>
               <option value="">— Escolha o cliente —</option>
-              {customerList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              <option value="final">Consumidor final</option>
+              {customerList
+                .filter((c) => c.name !== "Consumidor final")
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
             </select>
           </div>
+          {customerId === "final" ? (
+            <>
+              <div className="field">
+                <label htmlFor="contact_name">Nome do cliente</label>
+                <input id="contact_name" name="contact_name" defaultValue={v.contact_name} placeholder="Para identificar a OS" autoComplete="off" maxLength={120} />
+              </div>
+              <div className="field">
+                <label htmlFor="contact_phone">Telefone / WhatsApp</label>
+                <input id="contact_phone" name="contact_phone" defaultValue={v.contact_phone} inputMode="tel" placeholder="(11) 99999-0000" autoComplete="off" maxLength={30} />
+              </div>
+            </>
+          ) : null}
           <NewCustomerButton
             customers={customerList}
             onPick={setCustomerId}

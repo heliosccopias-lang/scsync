@@ -5,6 +5,8 @@ import { formatBRL } from "@/lib/money";
 export type SheetData = {
   os: {
     number: number;
+    contact_name?: string | null;
+    contact_phone?: string | null;
     kind: string;
     status: string;
     os_date: string;
@@ -42,6 +44,8 @@ export type SheetData = {
  */
 export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData; mode?: "customer" | "production" }) {
   const { os, org, customer: c, items, installments } = data;
+  // "Consumidor final" with a walk-in contact: print the person's name and phone.
+  const walkIn = c?.name === "Consumidor final" && (os.contact_name || os.contact_phone);
   const production = mode === "production";
   const title = production ? "ORDEM DE PRODUÇÃO" : os.kind === "quote" ? "ORÇAMENTO" : "ORDEM DE SERVIÇO";
   const services = items.filter((i) => i.kind === "service" && !i.rejected);
@@ -72,7 +76,7 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
         <div className="grid">
           <div>
             <span>Nome</span>
-            <strong>{c?.name}</strong>
+            <strong>{walkIn && os.contact_name ? `${os.contact_name} (consumidor final)` : c?.name}</strong>
           </div>
           <div>
             <span>CPF/CNPJ</span>
@@ -80,7 +84,7 @@ export function ServiceOrderSheet({ data, mode = "customer" }: { data: SheetData
           </div>
           <div>
             <span>Telefone</span>
-            {c?.phone ?? "—"}
+            {(walkIn ? os.contact_phone : c?.phone) ?? "—"}
           </div>
           <div>
             <span>E-mail</span>
