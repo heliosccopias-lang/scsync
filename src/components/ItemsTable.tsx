@@ -74,7 +74,7 @@ export function ItemsTable({
           <thead>
             <tr>
               <th>Tipo</th>
-              <th>Descrição do produto ou serviço</th>
+              <th>Descrição do serviço</th>
               <th className="num">Quantidade</th>
               <th className="num">Preço unitário (R$)</th>
               <th className="num">Valor total</th>
