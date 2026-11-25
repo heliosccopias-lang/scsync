@@ -163,6 +163,7 @@ const PAYMENT_LABEL: Record<string, [string, string]> = {
   paid: ["Paga", "pill-paid"],
   overdue: ["Em atraso", "pill-overdue"],
   cancelled: ["Cancelada", "pill-neutral"],
+  grouped: ["Agrupada", "pill-open"],
 };
 
 export function PaymentPill({ status }: { status: string }) {

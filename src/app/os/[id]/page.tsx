@@ -93,7 +93,7 @@ export default async function ServiceOrderPage({
     sb.from("service_order_installments").select("*").eq("service_order_id", id).order("number"),
     sb
       .from("receivables_view")
-      .select("id, name, due_date, amount_cents, paid_cents, open_cents, status, overdue, method")
+      .select("id, name, due_date, amount_cents, paid_cents, open_cents, status, overdue, method, grouped_into_id")
       .eq("origin_type", "service_order")
       .eq("origin_id", id)
       .order("due_date"),
@@ -635,7 +635,8 @@ export default async function ServiceOrderPage({
         (receivables ?? []).map((r, idx) => {
           const c = chargeBy.get(r.id);
           const live = c && ["pending", "overdue", "confirmed"].includes(c.status);
-          const open = r.status !== "paid" && r.status !== "cancelled";
+          // A grouped installment is charged and received through its group, never on its own.
+          const open = r.status !== "paid" && r.status !== "cancelled" && r.status !== "grouped";
           const status = r.overdue ? "overdue" : r.status;
           const message = [
             `Olá, ${customer?.name?.split(" ")[0] ?? ""}! Aqui é da ${orgName}.`,
@@ -662,6 +663,13 @@ export default async function ServiceOrderPage({
                 </div>
                 <PaymentPill status={status} />
               </div>
+              {r.grouped_into_id ? (
+                <p className="muted" style={{ margin: "0 0 8px" }}>
+                  {r.status === "paid" ? "Paga pela " : "Está na "}
+                  <Link href={`/receber/${r.grouped_into_id}`}>cobrança agrupada</Link>
+                  {r.status === "paid" ? "." : ": cobre e receba por lá."}
+                </p>
+              ) : null}
 
               {live ? (
                 <div className="notice" style={{ background: "var(--orange-soft)", color: "var(--ink)", marginBottom: 10 }}>

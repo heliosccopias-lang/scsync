@@ -196,9 +196,9 @@ export default async function ReceivablesPage({
                   <td>
                     <Link href={`/receber/${r.id}`}>{r.name}</Link>
                     {r.origin_type === "grouping" ? <span className="pill pill-open" style={{ marginLeft: 6 }}>Agrupada</span> : null}
-                    {r.status === "grouped" && r.grouped_into_id ? (
+                    {r.grouped_into_id ? (
                       <Link href={`/receber/${r.grouped_into_id}`} className="muted" style={{ fontSize: 12, marginLeft: 6 }}>
-                        (na cobrança agrupada)
+                        {r.status === "paid" ? "(paga na cobrança agrupada)" : "(na cobrança agrupada)"}
                       </Link>
                     ) : null}
                     {r.origin_type === "service_order" ? (

@@ -28,26 +28,37 @@ export default async function PaidOrdersPage({ searchParams }: { searchParams: P
     .limit(1000);
   const ids = (orders ?? []).map((o) => o.id as string);
   const { data: recs } = ids.length
-    ? await ctx.sb.from("receivables").select("id, origin_id").eq("origin_type", "service_order").in("origin_id", ids).neq("status", "cancelled")
-    : { data: [] as { id: string; origin_id: string }[] };
-  const osOfRec = new Map((recs ?? []).map((r) => [r.id as string, r.origin_id as string]));
-  const recIds = [...osOfRec.keys()];
+    ? await ctx.sb.from("receivables").select("id, origin_id, amount_cents, grouped_into_id").eq("origin_type", "service_order").in("origin_id", ids).neq("status", "cancelled")
+    : { data: [] as { id: string; origin_id: string; amount_cents: number; grouped_into_id: string | null }[] };
+  // Each payment counts for the OS of its receivable. A grouped item was paid through its group: it takes
+  // the group's payment date and method, with its own share of the amount.
+  const share = new Map<string, { os: string; part: number }[]>(); // receivable that holds the money -> OS shares
+  const groupIds = [...new Set((recs ?? []).map((r) => r.grouped_into_id as string | null).filter(Boolean))] as string[];
+  const { data: groups } = groupIds.length ? await ctx.sb.from("receivables").select("id, amount_cents").in("id", groupIds) : { data: [] };
+  const groupAmount = new Map((groups ?? []).map((g) => [g.id as string, Number(g.amount_cents)]));
+  for (const r of recs ?? []) {
+    const holder = (r.grouped_into_id as string | null) ?? (r.id as string);
+    const part = r.grouped_into_id ? Number(r.amount_cents) / (groupAmount.get(r.grouped_into_id as string) || Number(r.amount_cents)) : 1;
+    share.set(holder, [...(share.get(holder) ?? []), { os: r.origin_id as string, part }]);
+  }
+  const recIds = [...share.keys()];
   const settlements: { receivable_id: string; paid_on: string; method: string; amount_cents: number }[] = [];
   for (let i = 0; i < recIds.length; i += 300) {
-    const { data } = await ctx.sb.from("settlements").select("receivable_id, paid_on, method, amount_cents").in("receivable_id", recIds.slice(i, i + 300));
+    const { data } = await ctx.sb.from("settlements").select("receivable_id, paid_on, method, amount_cents").in("receivable_id", recIds.slice(i, i + 300)).is("reversed_at", null);
     settlements.push(...((data ?? []) as typeof settlements));
   }
 
   // Per OS: when it was paid (last payment), how (methods) and how much.
   const info = new Map<string, { paidOn: string; methods: Map<string, number>; total: number }>();
   for (const s of settlements) {
-    const os = osOfRec.get(s.receivable_id);
-    if (!os) continue;
-    const i = info.get(os) ?? { paidOn: "", methods: new Map<string, number>(), total: 0 };
-    if (s.paid_on > i.paidOn) i.paidOn = s.paid_on;
-    i.methods.set(s.method, (i.methods.get(s.method) ?? 0) + Number(s.amount_cents));
-    i.total += Number(s.amount_cents);
-    info.set(os, i);
+    for (const { os, part } of share.get(s.receivable_id) ?? []) {
+      const i = info.get(os) ?? { paidOn: "", methods: new Map<string, number>(), total: 0 };
+      const amount = Math.round(Number(s.amount_cents) * part);
+      if (s.paid_on > i.paidOn) i.paidOn = s.paid_on;
+      i.methods.set(s.method, (i.methods.get(s.method) ?? 0) + amount);
+      i.total += amount;
+      info.set(os, i);
+    }
   }
 
   const rows = (orders ?? [])

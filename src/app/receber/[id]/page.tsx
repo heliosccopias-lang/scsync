@@ -97,9 +97,11 @@ export default async function ReceivableDetail({ params, searchParams }: { param
         ) : null}
       </div>
       <Notice error={error} ok={ok} />
-      {r.status === "grouped" && parent ? (
-        <div className="notice notice-warn">
-          Esta conta está dentro da cobrança agrupada <Link href={`/receber/${parent.id}`}>{parent.name}</Link>: cobre e receba por lá.
+      {r.grouped_into_id && parent ? (
+        <div className={`notice ${r.status === "paid" ? "notice-ok" : "notice-warn"}`}>
+          {r.status === "paid" ? "Paga pela cobrança agrupada " : "Esta conta está dentro da cobrança agrupada "}
+          <Link href={`/receber/${parent.id}`}>{parent.name}</Link>
+          {r.status === "paid" ? "." : ": cobre e receba por lá."}
         </div>
       ) : null}
       {isGroup ? (
