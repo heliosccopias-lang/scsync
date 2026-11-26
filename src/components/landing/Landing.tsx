@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { PLANS, TRIAL_DAYS, YEARLY_DISCOUNT, priceCents, type PlanKey } from "@/lib/plans";
-import { formatBRL } from "@/lib/money";
+import { TRIAL_DAYS } from "@/lib/plans";
+
+const WHATSAPP_URL =
+  "https://wa.me/5511999679058?text=" +
+  encodeURIComponent("Olá! Quero contratar o SCsync completo (12x de R$ 420,00) para a minha gráfica.");
 
 /* Simple line icons (24×24, stroke = currentColor) */
 const I = {
@@ -12,7 +15,7 @@ const I = {
   box: "M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10",
   users: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5M16 4.5a3.5 3.5 0 0 1 0 6.5M18 15c1.8.6 3 2.2 3.5 5",
   pos: "M7 2h10v20H7zM10 6h4M10 10h4M10 14h1M13 14h1M10 17h1M13 17h1",
-  nf: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6",
+  screen: "M3 4h18v12H3zM8 20h8M12 16v4",
   check: "M5 12.5l4.5 4.5L19 7",
   dash: "M7 12h10",
 };
@@ -31,7 +34,7 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   { icon: I.box, title: "Venda no balcão e estoque", text: "Papel, tinta, envelope, agenda e caneta vendidos em segundos, com baixa de estoque e tabela de preços por planilha." },
   { icon: I.bank, title: "Conciliação bancária", text: "Extrato do banco por arquivo ou automático (Open Finance). O sistema casa cada entrada e saída com as contas." },
   { icon: I.chat, title: "Cartão de crédito pelo WhatsApp", text: "A equipe avisa os gastos para o robô e, no fechamento, tudo é conferido com a fatura do banco." },
-  { icon: I.nf, title: "Nota fiscal de serviço", text: "No plano Completo, emita a NFS-e pela OS, avulsa ou automaticamente quando o cliente pagar." },
+  { icon: I.screen, title: "Funciona em qualquer tela", text: "Computador, tablet ou celular, pelo navegador, sem instalar nada." },
   { icon: I.users, title: "Cada um com seu acesso", text: "Atendimento, produção e financeiro com login e perfil próprios. Vários CNPJs na mesma conta." },
 ];
 
@@ -41,35 +44,24 @@ const STEPS: [string, string][] = [
   ["Feche o mês sem planilha", "Banco e cartão conferidos, contas em dia e relatórios prontos."],
 ];
 
-type Row = { label: string; plans: Record<PlanKey, boolean | string> };
-const COMPARE: Row[] = [
-  { label: "Ordens de serviço e orçamentos", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Pix, boleto e baixa automática", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Maquininha integrada (Stone, Mercado Pago)", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Contas a receber e a pagar", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Conciliação bancária e de cartão", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Robô de WhatsApp para despesas", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Usuários com perfis de acesso", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Venda no balcão", plans: { servicos: true, servicos_produtos: true, completo: true } },
-  { label: "Produtos com controle de estoque", plans: { servicos: false, servicos_produtos: true, completo: true } },
-  { label: "Vários CNPJs na mesma conta", plans: { servicos: false, servicos_produtos: true, completo: true } },
-  { label: "Nota fiscal de serviço (NFS-e)", plans: { servicos: false, servicos_produtos: false, completo: true } },
-  { label: "Suporte prioritário", plans: { servicos: false, servicos_produtos: false, completo: true } },
+const PROJECT_ITEMS: string[] = [
+  "Sistema completo instalado e configurado",
+  "Personalizado com a marca e os dados da sua gráfica",
+  "Contas bancárias conectadas e conciliação funcionando",
+  "Pix e boleto com baixa automática",
+  "Maquininhas Stone e Mercado Pago integradas",
+  "Robô de WhatsApp ligado ao número da gráfica",
 ];
 
 const FAQ: [string, string][] = [
-  ["Preciso de cartão de crédito para testar?", `Não. São ${TRIAL_DAYS} dias grátis com tudo liberado. Só no fim do teste você escolhe o plano.`],
-  ["Como pago a mensalidade?", "Por Pix, boleto ou cartão, numa página segura do Asaas. No plano anual você economiza 15%."],
-  ["Posso trocar de plano depois?", "Pode, a qualquer momento. O novo valor vale a partir da próxima mensalidade."],
+  ["O que está incluído no projeto completo?", "O sistema instalado, configurado e personalizado com a marca da sua gráfica, com bancos, Pix, boleto, maquininhas e WhatsApp integrados e funcionando."],
+  ["O que eu preciso fornecer?", "Só o acesso às contas bancárias e ao WhatsApp da gráfica. Com isso, nossa equipe faz as conexões e a configuração."],
+  ["Como funciona o teste grátis?", `São ${TRIAL_DAYS} dias para conhecer o sistema, sem cartão de crédito. No teste, as integrações com bancos, maquininhas e WhatsApp ficam desligadas: elas são configuradas na contratação.`],
   ["Meus dados ficam seguros?", "Cada gráfica só enxerga os próprios dados, com login individual, perfis de acesso e histórico de alterações."],
-  ["E se eu cancelar?", "A conta continua funcionando até o fim do período já pago. Seus dados não são apagados."],
   ["Funciona no celular?", "Sim, pelo navegador do computador, tablet ou celular, sem instalar nada."],
 ];
 
-const cents = (c: number) => formatBRL(c).replace(/^R\$\s?/, "");
-
 export function Landing() {
-  const discount = Math.round(YEARLY_DISCOUNT * 100);
   return (
     <div className="lp">
       <header className="lp-top">
@@ -81,7 +73,7 @@ export function Landing() {
           <nav className="lp-nav">
             <a href="#recursos">Recursos</a>
             <a href="#como-funciona">Como funciona</a>
-            <a href="#planos">Planos</a>
+            <a href="#investimento">Investimento</a>
             <a href="#duvidas">Dúvidas</a>
           </nav>
           <div className="lp-top-cta">
@@ -110,8 +102,8 @@ export function Landing() {
               <Link className="lp-btn" href="/login?cadastro=1">
                 Testar grátis por {TRIAL_DAYS} dias
               </Link>
-              <a className="lp-btn lp-btn-ghost" href="#planos">
-                Ver planos e preços
+              <a className="lp-btn lp-btn-ghost" href="#investimento">
+                Ver o projeto completo
               </a>
             </div>
             <ul className="lp-trust">
@@ -119,10 +111,10 @@ export function Landing() {
                 <Icon d={I.check} size={16} /> Sem cartão de crédito
               </li>
               <li>
-                <Icon d={I.check} size={16} /> Tudo liberado no teste
+                <Icon d={I.check} size={16} /> Teste sem as integrações
               </li>
               <li>
-                <Icon d={I.check} size={16} /> A partir de {formatBRL(Math.round(priceCents("servicos", "yearly") / 12))}/mês
+                <Icon d={I.check} size={16} /> Projeto completo em 12x de R$ 420,00
               </li>
             </ul>
           </div>
@@ -238,97 +230,43 @@ export function Landing() {
         </div>
       </section>
 
-      <section id="planos" className="lp-section">
+      <section id="investimento" className="lp-section">
         <div className="lp-wrap">
           <div className="lp-head">
-            <span className="lp-eyebrow">Planos</span>
-            <h2>Preço simples, sem taxa de implantação</h2>
-            <p>
-              {TRIAL_DAYS} dias grátis em qualquer plano. No anual, {discount}% de desconto.
-            </p>
+            <span className="lp-eyebrow">Investimento</span>
+            <h2>Um projeto completo, entregue pronto</h2>
+            <p>Você contrata e nós configuramos tudo. Você só disponibiliza as contas bancárias e o WhatsApp para as conexões.</p>
           </div>
 
-          {/* Monthly / yearly switch without JavaScript: the radios drive the CSS below */}
-          <input type="radio" name="lp-cycle" id="lp-cycle-m" className="lp-cycle" defaultChecked />
-          <input type="radio" name="lp-cycle" id="lp-cycle-y" className="lp-cycle" />
-          <div className="lp-switch" role="group" aria-label="Forma de pagamento">
-            <label htmlFor="lp-cycle-m">Mensal</label>
-            <label htmlFor="lp-cycle-y">
-              Anual <span>−{discount}%</span>
-            </label>
-          </div>
-
-          <div className="lp-plans">
-            {PLANS.map((p) => {
-              const hi = p.key === "servicos_produtos";
-              const yearly = priceCents(p.key, "yearly");
-              return (
-                <div key={p.key} className={`lp-plan${hi ? " lp-plan-hi" : ""}`}>
-                  {hi ? <span className="lp-badge">Mais escolhido</span> : null}
-                  <h3>{p.name}</h3>
-                  <p className="lp-plan-sum">{p.summary}</p>
-                  <div className="lp-price lp-price-m">
-                    <small>R$</small>
-                    {cents(p.monthlyCents)}
-                    <span>/mês</span>
-                  </div>
-                  <div className="lp-price lp-price-y">
-                    <small>R$</small>
-                    {cents(Math.round(yearly / 12))}
-                    <span>/mês</span>
-                  </div>
-                  <div className="lp-price-note lp-price-m">cobrado mensalmente</div>
-                  <div className="lp-price-note lp-price-y">
-                    {formatBRL(yearly)} por ano · economia de {formatBRL(p.monthlyCents * 12 - yearly)}
-                  </div>
-                  <ul>
-                    {p.features.map((f) => (
-                      <li key={f}>
-                        <Icon d={I.check} size={16} />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link className={`lp-btn${hi ? "" : " lp-btn-outline"}`} href="/login?cadastro=1">
-                    Começar o teste grátis
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="lp-compare-wrap">
-            <table className="lp-compare">
-              <thead>
-                <tr>
-                  <th>Compare os planos</th>
-                  {PLANS.map((p) => (
-                    <th key={p.key}>
-                      {p.name}
-                      <span className="lp-price-m">{formatBRL(p.monthlyCents)}/mês</span>
-                      <span className="lp-price-y">{formatBRL(Math.round(priceCents(p.key, "yearly") / 12))}/mês</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARE.map((r) => (
-                  <tr key={r.label}>
-                    <td>{r.label}</td>
-                    {PLANS.map((p) => (
-                      <td key={p.key} className={r.plans[p.key] ? "yes" : "no"}>
-                        {r.plans[p.key] ? <Icon d={I.check} size={18} /> : <Icon d={I.dash} size={18} />}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="lp-plan lp-plan-hi" style={{ maxWidth: 560, margin: "24px auto 0" }}>
+            <span className="lp-badge">Projeto completo</span>
+            <h3>SCsync completo</h3>
+            <p className="lp-plan-sum">Configurado, personalizado e com as integrações funcionando</p>
+            <div className="lp-price">
+              <small>12x R$</small>
+              420,00
+            </div>
+            <div className="lp-price-note">Combinamos a contratação pelo WhatsApp</div>
+            <ul>
+              {PROJECT_ITEMS.map((f) => (
+                <li key={f}>
+                  <Icon d={I.check} size={16} />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <div style={{ display: "grid", gap: 12 }}>
+              <a className="lp-btn" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
+                Quero contratar pelo WhatsApp
+              </a>
+              <Link className="lp-btn lp-btn-ghost" href="/login?cadastro=1">
+                Testar grátis por {TRIAL_DAYS} dias (sem integrações)
+              </Link>
+            </div>
           </div>
           <p className="lp-fine">
-            Valores por conta, já com todas as atualizações. O plano Completo emite nota fiscal de serviço (NFS-e) pela conta Asaas da gráfica; precisa
-            do CNPJ e do cadastro fiscal na prefeitura. Nota de produto (NF-e) não está incluída. Taxas de Pix, boleto e maquininha são as do seu
-            provedor.
+            O teste grátis mostra o sistema completo, mas sem as integrações com bancos, maquininhas e WhatsApp: elas são configuradas na contratação.
+            Taxas de Pix, boleto e maquininha são as do seu provedor.
           </p>
         </div>
       </section>
@@ -351,7 +289,7 @@ export function Landing() {
       <section className="lp-final">
         <div className="lp-wrap">
           <h2>Comece hoje e veja a diferença no fechamento do mês.</h2>
-          <p>Teste grátis por {TRIAL_DAYS} dias, sem cartão de crédito.</p>
+          <p>Teste grátis por {TRIAL_DAYS} dias, sem cartão de crédito e sem as integrações.</p>
           <Link className="lp-btn lp-btn-light" href="/login?cadastro=1">
             Criar minha conta grátis
           </Link>
@@ -364,7 +302,7 @@ export function Landing() {
           <img src="/brand/scsync-logo-compact.svg" alt="SCsync" height={52} />
           <nav>
             <a href="#recursos">Recursos</a>
-            <a href="#planos">Planos</a>
+            <a href="#investimento">Investimento</a>
             <a href="#duvidas">Dúvidas</a>
             <Link href="/login">Entrar</Link>
           </nav>
