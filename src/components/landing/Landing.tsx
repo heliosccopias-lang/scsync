@@ -99,6 +99,21 @@ export function Landing() {
               O SCsync organiza as OS, cobra por Pix, boleto e maquininha, dá baixa sozinho quando o cliente paga e confere o banco e o cartão para
               você.
             </p>
+            <p
+              style={{
+                display: "inline-block",
+                margin: "0 0 26px",
+                padding: "10px 18px",
+                borderRadius: 12,
+                background: "var(--orange)",
+                color: "var(--ink)",
+                fontSize: "clamp(20px, 2.4vw, 26px)",
+                fontWeight: 800,
+                lineHeight: 1.2,
+              }}
+            >
+              Pagou as 12x, o sistema é seu.
+            </p>
             <div className="lp-cta">
               <Link className="lp-btn" href="/login?cadastro=1">
                 Testar grátis por {TRIAL_DAYS} dias
@@ -247,7 +262,10 @@ export function Landing() {
               <small>12x R$</small>
               420,00
             </div>
-            <div className="lp-price-note">Sem mensalidade do sistema · pagou as 12x, é seu</div>
+            <div className="lp-price-note">Sem mensalidade do sistema</div>
+            <p style={{ margin: "0 0 22px", fontSize: "clamp(22px, 2.6vw, 28px)", fontWeight: 800, lineHeight: 1.15, color: "var(--orange)" }}>
+              Pagou as 12x, o sistema é seu.
+            </p>
             <ul>
               {PROJECT_ITEMS.map((f) => (
                 <li key={f}>
