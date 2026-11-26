@@ -45,7 +45,7 @@ const STEPS: [string, string][] = [
 ];
 
 const PROJECT_ITEMS: string[] = [
-  "Sistema completo instalado e configurado",
+  "Sistema completo instalado na conta da sua gráfica",
   "Personalizado com a marca e os dados da sua gráfica",
   "Contas bancárias conectadas e conciliação funcionando",
   "Pix e boleto com baixa automática",
@@ -55,6 +55,7 @@ const PROJECT_ITEMS: string[] = [
 
 const FAQ: [string, string][] = [
   ["O que está incluído no projeto completo?", "O sistema instalado, configurado e personalizado com a marca da sua gráfica, com bancos, Pix, boleto, maquininhas e WhatsApp integrados e funcionando."],
+  ["Depois das 12 parcelas, eu pago mensalidade?", "Não há mensalidade do sistema. Ele fica na conta da sua gráfica, e você paga só a hospedagem, direto ao provedor. As taxas de Pix, boleto e maquininha continuam sendo as de cada serviço."],
   ["O que eu preciso fornecer?", "Só o acesso às contas bancárias e ao WhatsApp da gráfica. Com isso, nossa equipe faz as conexões e a configuração."],
   ["Como funciona o teste grátis?", `São ${TRIAL_DAYS} dias para conhecer o sistema, sem cartão de crédito. No teste, as integrações com bancos, maquininhas e WhatsApp ficam desligadas: elas são configuradas na contratação.`],
   ["Meus dados ficam seguros?", "Cada gráfica só enxerga os próprios dados, com login individual, perfis de acesso e histórico de alterações."],
@@ -114,7 +115,7 @@ export function Landing() {
                 <Icon d={I.check} size={16} /> Teste sem as integrações
               </li>
               <li>
-                <Icon d={I.check} size={16} /> Projeto completo em 12x de R$ 420,00
+                <Icon d={I.check} size={16} /> 12x de R$ 420,00, sem mensalidade
               </li>
             </ul>
           </div>
@@ -235,7 +236,7 @@ export function Landing() {
           <div className="lp-head">
             <span className="lp-eyebrow">Investimento</span>
             <h2>Um projeto completo, entregue pronto</h2>
-            <p>Você contrata e nós configuramos tudo. Você só disponibiliza as contas bancárias e o WhatsApp para as conexões.</p>
+            <p>Pagou as 12x, o sistema é seu: ele fica na conta da sua gráfica, sem mensalidade. Você só disponibiliza as contas bancárias e o WhatsApp para as conexões.</p>
           </div>
 
           <div className="lp-plan lp-plan-hi" style={{ maxWidth: 560, margin: "24px auto 0" }}>
@@ -246,7 +247,7 @@ export function Landing() {
               <small>12x R$</small>
               420,00
             </div>
-            <div className="lp-price-note">Combinamos a contratação pelo WhatsApp</div>
+            <div className="lp-price-note">Sem mensalidade do sistema · pagou as 12x, é seu</div>
             <ul>
               {PROJECT_ITEMS.map((f) => (
                 <li key={f}>
@@ -266,7 +267,7 @@ export function Landing() {
           </div>
           <p className="lp-fine">
             O teste grátis mostra o sistema completo, mas sem as integrações com bancos, maquininhas e WhatsApp: elas são configuradas na contratação.
-            Taxas de Pix, boleto e maquininha são as do seu provedor.
+            O sistema fica na conta da sua gráfica: a hospedagem é paga direto ao provedor. Taxas de Pix, boleto e maquininha são as do seu provedor.
           </p>
         </div>
       </section>
