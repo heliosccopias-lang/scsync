@@ -30,7 +30,7 @@ function Icon({ d, size = 22 }: { d: string; size?: number }) {
 const FEATURES: { icon: string; title: string; text: string }[] = [
   { icon: I.os, title: "OS feita para gráfica", text: "Formato, papel, cores, acabamento e arte aprovada. Via do cliente, ordem de produção e recibo em A4, com o seu logo." },
   { icon: I.pix, title: "Pix com baixa automática", text: "Gere o Pix da OS e mande pelo WhatsApp. Quando o cliente paga, a conta é baixada e a OS vira Paga sozinha." },
-  { icon: I.pos, title: "Maquininha integrada", text: "Envie o valor direto para a maquininha Stone ou Mercado Pago e receba a baixa assim que o cartão é aprovado." },
+  { icon: I.pos, title: "Maquininha com baixa automática", text: "Envie o valor da OS direto para a maquininha Stone ou Mercado Pago. Quando o cartão é aprovado, a conta e a ordem de serviço recebem baixa automática." },
   { icon: I.box, title: "Venda no balcão e estoque", text: "Papel, tinta, envelope, agenda e caneta vendidos em segundos, com baixa de estoque e tabela de preços por planilha." },
   { icon: I.bank, title: "Conciliação bancária", text: "Extrato do banco por arquivo ou automático (Open Finance). O sistema casa cada entrada e saída com as contas." },
   { icon: I.chat, title: "Cartão de crédito pelo WhatsApp", text: "A equipe avisa os gastos para o robô e, no fechamento, tudo é conferido com a fatura do banco." },
